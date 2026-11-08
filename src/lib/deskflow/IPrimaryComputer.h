@@ -165,6 +165,16 @@ public:
   */
   virtual bool isAnyMouseButtonDown(uint32_t &buttonID) const = 0;
 
+  //! Test if an app has taken over the mouse
+  /*!
+  Return true if, while the cursor is on this computer, an app such as a game
+  has hidden the cursor or confined it, so the cursor shouldn't leave it.
+  */
+  virtual bool isMouseCapturedByApp() const
+  {
+    return false;
+  }
+
   //! Get cursor center position
   /*!
   Return the cursor center position which is where we park the

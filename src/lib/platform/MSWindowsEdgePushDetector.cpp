@@ -196,6 +196,12 @@ private:
     const int right = left + GetSystemMetrics(SM_CXVIRTUALSCREEN) - 1;
     const int bottom = top + GetSystemMetrics(SM_CYVIRTUALSCREEN) - 1;
 
+    // a game (or any app) that confines the cursor keeps it: never swap roles mid-game
+    RECT clip;
+    if (GetClipCursor(&clip) && (clip.left > left || clip.top > top || clip.right <= right || clip.bottom <= bottom)) {
+      return;
+    }
+
     EdgePushAccumulator::Edges at;
     at.left = cursor.x <= left;
     at.right = cursor.x >= right;

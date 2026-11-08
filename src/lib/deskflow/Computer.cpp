@@ -361,6 +361,10 @@ bool Computer::isLockedToComputer() const
     LOG_DEBUG("locked by mouse buttonID: %d", buttonID);
     return true;
   }
+  if (m_computer->isMouseCapturedByApp()) {
+    LOG_DEBUG("locked, an app (e.g. a game) has taken over the mouse");
+    return true;
+  }
   // not locked
   return false;
 }

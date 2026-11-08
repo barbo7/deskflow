@@ -667,6 +667,34 @@ int32_t MSWindowsComputer::getJumpZoneSize() const
   return 1;
 }
 
+bool MSWindowsComputer::isMouseCapturedByApp() const
+{
+  // only matters while the cursor is here; deskflow hides it while it's on another computer
+  if (!m_isPrimary || !m_isOnComputer) {
+    return false;
+  }
+
+  // games typically hide the cursor, or confine it to their window
+  CURSORINFO cursor = {};
+  cursor.cbSize = sizeof(cursor);
+  if (GetCursorInfo(&cursor) && (cursor.flags & CURSOR_SHOWING) == 0) {
+    return true;
+  }
+
+  RECT clip;
+  if (GetClipCursor(&clip)) {
+    const LONG left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    const LONG top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    const LONG right = left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    const LONG bottom = top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    if (clip.left > left || clip.top > top || clip.right < right || clip.bottom < bottom) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 bool MSWindowsComputer::isAnyMouseButtonDown(uint32_t &buttonID) const
 {
   static const char *buttonToName[] = {"<invalid>",    "Left Button", "Middle Button",
