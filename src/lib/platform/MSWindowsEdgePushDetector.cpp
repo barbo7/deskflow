@@ -30,9 +30,11 @@ const wchar_t *const kWindowClass = L"DeskflowEdgePushDetector";
 class MSWindowsEdgePushDetector : public EdgePushDetector
 {
 public:
-  MSWindowsEdgePushDetector(uint32_t edges, Callback onPush)
-      : m_accumulator(edges, kPushThreshold),
-        m_onPush(std::move(onPush))
+  MSWindowsEdgePushDetector(uint32_t edges, Callback onPush, Callback onInputBlocked)
+      : m_edges(edges),
+        m_accumulator(edges, kPushThreshold),
+        m_onPush(std::move(onPush)),
+        m_onInputBlocked(std::move(onInputBlocked))
   {
   }
 
@@ -96,6 +98,9 @@ private:
       return;
     }
 
+    // check now and then whether we can still control the input desktop
+    SetTimer(window, kDesktopTimer, 500, nullptr);
+
     started.set_value(window);
 
     MSG message;
@@ -115,7 +120,14 @@ private:
       }
       break;
 
+    case WM_TIMER:
+      if (self != nullptr && wParam == kDesktopTimer) {
+        self->checkInputDesktop();
+      }
+      return 0;
+
     case WM_CLOSE: {
+      KillTimer(window, kDesktopTimer);
       RAWINPUTDEVICE device = {};
       device.usUsagePage = 0x01;
       device.usUsage = 0x02;
@@ -136,6 +148,24 @@ private:
     return DefWindowProcW(window, message, wParam, lParam);
   }
 
+  void checkInputDesktop()
+  {
+    // an elevation prompt (UAC), the lock screen and the like run on a secure desktop that a
+    // desktop-mode process can't open or inject into. if the server's cursor is here then, the
+    // user is stuck: hand the cursor back to the server.
+    HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+    const bool blocked = desktop == nullptr;
+    if (desktop != nullptr) {
+      CloseDesktop(desktop);
+    }
+
+    if (blocked && !m_inputBlocked) {
+      LOG_INFO("can't control the current screen (e.g. an elevation prompt), returning the cursor to the server");
+      m_onInputBlocked();
+    }
+    m_inputBlocked = blocked;
+  }
+
   void handleRawInput(HRAWINPUT handle)
   {
     UINT size = 0;
@@ -149,7 +179,7 @@ private:
     const auto *input = reinterpret_cast<const RAWINPUT *>(buffer.data());
 
     // injected input (e.g. from deskflow itself) has no device; only the user's hand counts
-    if (input->header.dwType != RIM_TYPEMOUSE || input->header.hDevice == nullptr) {
+    if (m_edges == 0 || input->header.dwType != RIM_TYPEMOUSE || input->header.hDevice == nullptr) {
       return;
     }
     const RAWMOUSE &mouse = input->data.mouse;
@@ -180,20 +210,23 @@ private:
     }
   }
 
+  static constexpr UINT_PTR kDesktopTimer = 1;
+
+  uint32_t m_edges;
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
+  Callback m_onInputBlocked;
+  bool m_inputBlocked = false;
   HWND m_window = nullptr;
   std::thread m_thread;
 };
 
 } // namespace
 
-std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush)
+std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush, Callback onInputBlocked)
 {
-  if (edges == 0) {
-    return nullptr;
-  }
-  auto detector = std::make_unique<MSWindowsEdgePushDetector>(edges, std::move(onPush));
+  // runs even with no edges to watch, to notice screens deskflow can't control
+  auto detector = std::make_unique<MSWindowsEdgePushDetector>(edges, std::move(onPush), std::move(onInputBlocked));
   if (!detector->start()) {
     return nullptr;
   }

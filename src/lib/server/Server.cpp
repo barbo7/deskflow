@@ -234,6 +234,17 @@ bool Server::setConfig(const ServerConfig &config)
     m_inputFilter->addFilterRule(rule);
   }
 
+  // a hotkey that always brings the cursor home, even when the computer it's on stops
+  // responding (e.g. it's showing a screen deskflow can't control): ctrl+alt+super+M,
+  // which is control+option+command+M on a mac.
+  {
+    IPlatformComputer::KeyInfo *key =
+        IPlatformComputer::KeyInfo::alloc('m', KeyModifierControl | KeyModifierAlt | KeyModifierSuper, 0, 0);
+    InputFilter::Rule rule(new InputFilter::KeystrokeCondition(m_events, key));
+    rule.adoptAction(new InputFilter::SwitchToComputerAction(m_events, getName(m_primaryClient)), true);
+    m_inputFilter->addFilterRule(rule);
+  }
+
   // tell primary computer about reconfiguration
   m_primaryClient->reconfigure(getActivePrimarySides());
 
@@ -334,7 +345,8 @@ void Server::sendConnectedClientsIpc() const
 
 void Server::switchToComputerByName(const std::string &computer)
 {
-  std::string name = m_config->getCanonicalName(computer);
+  // an empty name means the server itself
+  std::string name = computer.empty() ? getName(m_primaryClient) : m_config->getCanonicalName(computer);
   if (name.empty()) {
     name = computer;
   }
@@ -395,11 +407,15 @@ void Server::handleRoleSwapRequest(BaseClientProxy *client, const std::string &h
     return;
   }
 
-  LOG_INFO("\"%s\" is taking over as server, becoming its client", getName(client).c_str());
+  // only tell the gui once the client has acted on the go-ahead and dropped the connection;
+  // switching now could cut the connection before the go-ahead reaches the client, leaving
+  // both computers waiting for a server
+  LOG_INFO("\"%s\" asked to take over as server, waiting for it to restart", getName(client).c_str());
   m_roleSwapPending = true;
   m_roleSwapTimer.reset();
+  m_roleSwapClient = getName(client);
+  m_roleSwapHosts = hosts;
   client->roleSwapAccepted();
-  ipcSendToClient("roleSwap", QStringLiteral("client;%1").arg(QString::fromStdString(hosts)));
 }
 
 void Server::notifyActiveComputer() const
@@ -1388,6 +1404,17 @@ void Server::handleSwitchWaitTimeout()
 
 void Server::handleClientDisconnected(BaseClientProxy *client)
 {
+  // the client we agreed to swap roles with has restarted as the server: follow it
+  if (m_roleSwapPending && getName(client) == m_roleSwapClient) {
+    m_roleSwapPending = false;
+    if (m_roleSwapTimer.getTime() < 15.0) {
+      LOG_INFO("\"%s\" is now the server, becoming its client", m_roleSwapClient.c_str());
+      ipcSendToClient("roleSwap", QStringLiteral("client;%1").arg(QString::fromStdString(m_roleSwapHosts)));
+    } else {
+      LOG_INFO("\"%s\" disconnected too late, not swapping roles", m_roleSwapClient.c_str());
+    }
+  }
+
   // client has disconnected.  it might be an old client or an
   // active client.  we don't care so just handle it both ways.
   removeActiveClient(client);

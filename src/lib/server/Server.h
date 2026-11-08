@@ -422,9 +422,12 @@ private:
   std::string m_keyboardBroadcastingComputers;
 
   // all clients (including the primary client) indexed by name
-  // when the last role swap was accepted, to ignore repeated requests
+  // a role swap the client has been told about: once that client disconnects (it's
+  // restarting as the server), this computer restarts as its client
   Stopwatch m_roleSwapTimer;
   bool m_roleSwapPending = false;
+  std::string m_roleSwapClient;
+  std::string m_roleSwapHosts;
 
   using ClientList = std::map<std::string, BaseClientProxy *>;
   using ClientSet = std::set<BaseClientProxy *>;

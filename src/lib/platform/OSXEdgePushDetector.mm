@@ -133,7 +133,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush)
+std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush, Callback)
 {
   if (edges == 0) {
     return nullptr;

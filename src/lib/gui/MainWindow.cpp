@@ -712,6 +712,9 @@ void MainWindow::handleActiveComputerChanged(const QString &active, const QStrin
   if (active == m_activeComputer && computers == m_computers)
     return;
 
+  if (m_roleSwapRole == QStringLiteral("server") && computers.size() >= 2)
+    finishRoleSwap();
+
   m_activeComputer = active;
   m_computers = computers;
   updateSwitchMenu();
@@ -776,6 +779,11 @@ void MainWindow::updateSwitchMenu()
 
 void MainWindow::handleRoleSwap(const QString &role, const QString &data)
 {
+  if (!m_roleSwapRole.isEmpty()) {
+    qWarning("role swap: ignoring a request, a swap is already in progress");
+    return;
+  }
+
   if (role == QStringLiteral("client")) {
     // the other computer is taking over as server: connect to it
     qInfo().noquote() << "role swap: becoming a client of" << data;
@@ -803,11 +811,74 @@ void MainWindow::handleRoleSwap(const QString &role, const QString &data)
     return;
   }
 
+  // the other computer is already trusted in its old role; trust it in the new one too,
+  // or the swap would stop at a fingerprint prompt on each screen
+  shareTrustAcrossRoles();
+
   saveSettings();
   // changing mode stops the core; start it again in the new role once it's down
   if (m_coreProcess.processState() != ProcessState::Stopped && m_coreProcess.processState() != ProcessState::Stopping)
     m_coreProcess.stop();
   startCoreWhenStopped();
+
+  // if the two computers haven't found each other in the new roles by then, go back, so a
+  // failed swap never leaves both computers waiting for a server
+  m_roleSwapRole = role;
+  if (m_roleSwapTimer == nullptr) {
+    m_roleSwapTimer = new QTimer(this);
+    m_roleSwapTimer->setSingleShot(true);
+    connect(m_roleSwapTimer, &QTimer::timeout, this, &MainWindow::revertRoleSwap);
+  }
+  m_roleSwapTimer->start(45000);
+}
+
+void MainWindow::finishRoleSwap()
+{
+  if (m_roleSwapRole.isEmpty())
+    return;
+  qInfo().noquote() << "role swap: done, now the" << m_roleSwapRole;
+  m_roleSwapRole.clear();
+  m_roleSwapTimer->stop();
+}
+
+void MainWindow::revertRoleSwap()
+{
+  if (m_roleSwapRole.isEmpty())
+    return;
+
+  qWarning().noquote() << "role swap: the other computer didn't connect in time, going back to being the"
+                       << (m_roleSwapRole == QStringLiteral("client") ? "server" : "client");
+  // the old server's address is still in the hostname box, and the server keeps its layout
+  if (m_roleSwapRole == QStringLiteral("client"))
+    ui->rbModeServer->setChecked(true);
+  else
+    ui->rbModeClient->setChecked(true);
+  m_roleSwapRole.clear();
+
+  saveSettings();
+  if (m_coreProcess.processState() != ProcessState::Stopped && m_coreProcess.processState() != ProcessState::Stopping)
+    m_coreProcess.stop();
+  startCoreWhenStopped();
+}
+
+void MainWindow::shareTrustAcrossRoles()
+{
+  FingerprintDatabase servers;
+  FingerprintDatabase clients;
+  servers.read(Settings::tlsTrustedServersDb());
+  clients.read(Settings::tlsTrustedClientsDb());
+
+  const auto trustedServers = servers.fingerprints();
+  for (const auto &fingerprint : clients.fingerprints()) {
+    servers.addTrusted(fingerprint);
+  }
+  for (const auto &fingerprint : trustedServers) {
+    clients.addTrusted(fingerprint);
+  }
+
+  if (!servers.write(Settings::tlsTrustedServersDb()) || !clients.write(Settings::tlsTrustedClientsDb())) {
+    qWarning("role swap: couldn't update the trusted fingerprints");
+  }
 }
 
 void MainWindow::startCoreWhenStopped(int attempts)
@@ -1243,6 +1314,9 @@ void MainWindow::coreProcessStateChanged(ProcessState state)
 void MainWindow::coreConnectionStateChanged(ConnectionState state)
 {
   qDebug() << "core connection state changed:" << static_cast<int>(state);
+
+  if (m_roleSwapRole == QStringLiteral("client") && state == ConnectionState::Connected)
+    finishRoleSwap();
 
   updateStatus();
 

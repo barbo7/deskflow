@@ -28,9 +28,11 @@ public:
   /**
    * \param edges DirectionMask of the edges to watch.
    * \param onPush Called (from a worker thread) when the mouse is pushed past one of them.
+   * \param onInputBlocked Called (from a worker thread) when this computer switches to a screen
+   *        deskflow can't control, such as an elevation prompt; may not be supported everywhere.
    * \return nullptr if this platform can't watch the mouse.
    */
-  static std::unique_ptr<EdgePushDetector> create(uint32_t edges, Callback onPush);
+  static std::unique_ptr<EdgePushDetector> create(uint32_t edges, Callback onPush, Callback onInputBlocked);
 };
 
 } // namespace deskflow

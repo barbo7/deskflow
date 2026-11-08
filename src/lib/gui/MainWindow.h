@@ -28,6 +28,7 @@
 class QAction;
 class QHBoxLayout;
 class QLabel;
+class QTimer;
 class QMenu;
 class QLocalServer;
 
@@ -122,6 +123,9 @@ private:
   void updateSwitchMenu();
   void setupActiveComputerBar();
   void handleRoleSwap(const QString &role, const QString &data);
+  void finishRoleSwap();
+  void revertRoleSwap();
+  static void shareTrustAcrossRoles();
   void startCoreWhenStopped(int attempts = 50);
   void updateActiveComputerBar();
   bool setActiveComputerTrayIcon();
@@ -192,6 +196,8 @@ private:
   QString m_activeComputer;
   QStringList m_computers; // "name|platform"
   QList<QAction *> m_switchActions;
+  QTimer *m_roleSwapTimer = nullptr;
+  QString m_roleSwapRole; // the role a swap in progress is changing to, empty if none
   QWidget *m_activeComputerBar = nullptr;
   QLabel *m_activeComputerIcon = nullptr;
   QLabel *m_activeComputerLabel = nullptr;

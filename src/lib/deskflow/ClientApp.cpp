@@ -238,15 +238,22 @@ void ClientApp::handleClientDisconnected()
 void ClientApp::startEdgePushDetector()
 {
   m_edgePushDetector.reset();
-  if (m_client == nullptr || m_client->swapEdges() == 0) {
+  if (m_client == nullptr) {
     return;
   }
 
   // the detector calls back from its own thread; hand over to the event thread
   auto *events = getEvents();
-  m_edgePushDetector = deskflow::EdgePushDetector::create(m_client->swapEdges(), [events] {
-    events->addEvent(Event(EventTypes::AppRoleSwapRequest, events->getSystemTarget()));
-  });
+  m_edgePushDetector = deskflow::EdgePushDetector::create(
+      m_client->swapEdges(),
+      [events] { events->addEvent(Event(EventTypes::AppRoleSwapRequest, events->getSystemTarget())); },
+      [events] {
+        // an empty name asks the server to take the cursor back
+        events->addEvent(Event(
+            EventTypes::AppSwitchToComputerRequest, events->getSystemTarget(), new deskflow::SwitchRequestInfo({})
+        ));
+      }
+  );
 }
 
 void ClientApp::requestRoleSwap()
@@ -255,13 +262,30 @@ void ClientApp::requestRoleSwap()
     return;
   }
 
-  // the server will connect back to us as a client, so tell it where we are
-  QStringList hosts;
-  for (const auto &address : QNetworkInterface::allAddresses()) {
-    if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback() && !address.isLinkLocal()) {
-      hosts.append(address.toString());
+  // the server will connect back to us as a client, so tell it where we are. addresses on the
+  // same network as the server go first: others (vpn, virtual machine adapters) may not be
+  // reachable from it, and each one it tries costs a connection timeout.
+  const QHostAddress server(QString::fromStdString(getCurrentServerAddress().getHostname()));
+  QStringList sameNetwork;
+  QStringList others;
+  for (const auto &interface : QNetworkInterface::allInterfaces()) {
+    if (!interface.flags().testFlag(QNetworkInterface::IsUp) ||
+        interface.flags().testFlag(QNetworkInterface::IsLoopBack)) {
+      continue;
+    }
+    for (const auto &entry : interface.addressEntries()) {
+      const auto &address = entry.ip();
+      if (address.protocol() != QAbstractSocket::IPv4Protocol || address.isLinkLocal()) {
+        continue;
+      }
+      if (!server.isNull() && server.isInSubnet(address, entry.prefixLength())) {
+        sameNetwork.append(address.toString());
+      } else {
+        others.append(address.toString());
+      }
     }
   }
+  const QStringList hosts = sameNetwork + others;
   if (hosts.isEmpty()) {
     LOG_WARN("can't swap roles, no network address found");
     return;
