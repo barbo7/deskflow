@@ -109,6 +109,10 @@ public:
 
   void handleComputerError() const;
 
+  //! Ask the core (from any thread) to move the cursor to \p computer.
+  //! Handled on the event thread by ServerApp and ClientApp.
+  void requestSwitchToComputer(const std::string &computer) const;
+
   void updateExitCode(int errorCode)
   {
     m_exitCode = errorCode;

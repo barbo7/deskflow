@@ -51,6 +51,9 @@ public:
   bool onGrabClipboard(ClipboardID);
   void onClipboardChanged(ClipboardID, const IClipboard *);
 
+  //! Ask the server to move the cursor to \p computer (protocol 1.9+ only).
+  virtual void requestSwitchToComputer(const std::string &computer);
+
   //@}
 
 protected:
@@ -69,6 +72,11 @@ protected:
   deskflow::IStream *getStream() const
   {
     return m_stream;
+  }
+
+  Client *getClient() const
+  {
+    return m_client;
   }
 
 private:

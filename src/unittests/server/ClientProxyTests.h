@@ -22,6 +22,8 @@ private Q_SLOTS:
   void keyRepeat();
   void keyUp_data();
   void keyUp();
+  void activeComputerChanged_data();
+  void activeComputerChanged();
 
 private:
   Log m_log;

@@ -26,3 +26,13 @@ void ipcSendConnectionState(deskflow::core::ConnectionState state)
   const auto metaEnum = QMetaEnum::fromType<deskflow::core::ConnectionState>();
   ipcSendToClient(QStringLiteral("connectionState"), metaEnum.valueToKey(static_cast<int>(state)));
 }
+
+void ipcSendActiveComputer(const QString &active, const QString &computers)
+{
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server,
+      [active, computers] { deskflow::core::ipc::CoreIpcServer::instance().setActiveComputer(active, computers); },
+      Qt::QueuedConnection
+  );
+}

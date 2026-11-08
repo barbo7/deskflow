@@ -190,6 +190,12 @@ public:
   void setOptions(const OptionsList &options) override;
   std::string getName() const override;
 
+  //! Ask the server to move the cursor to \p computer.
+  void requestSwitchToComputer(const std::string &computer);
+
+  //! Called by the server proxy when the server says which computer has the cursor.
+  void activeComputerChanged(const std::string &active, const std::string &computers) const;
+
 private:
   void saveRelativeRestorePosition();
   void sendClipboard(ClipboardID);

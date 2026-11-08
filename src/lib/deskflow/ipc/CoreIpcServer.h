@@ -24,8 +24,22 @@ public:
 
   static CoreIpcServer &instance();
 
+  /**
+   * Remember and broadcast the active computer, so a gui that connects later
+   * can ask for it with `getActiveComputer`.
+   */
+  void setActiveComputer(const QString &active, const QString &computers);
+
+Q_SIGNALS:
+  void switchToComputerRequested(const QString &computer);
+
 private:
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;
+
+  QString activeComputerMessage() const;
+
+  QString m_activeComputer;
+  QString m_computers;
 };
 
 } // namespace deskflow::core::ipc

@@ -611,6 +611,18 @@ Do you want to connect to the server?
         <translation type="unfinished">Desconectar</translation>
     </message>
     <message>
+        <source>In use: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Switch to %1</source>
+        <translation type="unfinished">Cambiar a %1</translation>
+    </message>
+    <message>
+        <source>%1 - in use: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>%1 Connection Error</source>
         <translation>%1 Error de conexión</translation>
     </message>

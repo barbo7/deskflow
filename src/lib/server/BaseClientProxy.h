@@ -51,6 +51,23 @@ public:
     return false;
   }
 
+  //! Platform of the computer ("mac", "windows", "linux"), or empty if unknown.
+  virtual std::string getPlatform() const
+  {
+    return {};
+  }
+
+  /*!
+  Tell the client which computer has the cursor. \c computers lists the
+  connected computers as "name|platform" pairs joined by ",".
+  Only clients that speak protocol 1.9 or later do anything with it.
+  */
+  virtual void activeComputerChanged(const std::string &active, const std::string &computers)
+  {
+    (void)active;
+    (void)computers;
+  }
+
   //@}
 
   // IComputer

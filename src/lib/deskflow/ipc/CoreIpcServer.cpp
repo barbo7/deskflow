@@ -29,7 +29,6 @@ CoreIpcServer &CoreIpcServer::instance()
 
 void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts)
 {
-  Q_UNUSED(parts)
   if (command == QStringLiteral("stop")) {
     LOG_DEBUG("core ipc server got stop message");
     writeToClientSocket(clientSocket, QStringLiteral("ok"));
@@ -37,7 +36,35 @@ void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &co
     Q_EMIT stopProcessRequested();
     return;
   }
+  if (command == QStringLiteral("switchTo")) {
+    if (parts.size() < 2 || parts.at(1).isEmpty()) {
+      LOG_WARN("core ipc server got switchTo without a computer name");
+      return;
+    }
+    LOG_DEBUG("core ipc server got switch request: %s", parts.at(1).toUtf8().constData());
+    Q_EMIT switchToComputerRequested(parts.at(1));
+    return;
+  }
+  if (command == QStringLiteral("getActiveComputer")) {
+    writeToClientSocket(clientSocket, activeComputerMessage());
+    return;
+  }
   LOG_WARN("core ipc server got unknown command: %s", command.toUtf8().constData());
+}
+
+void CoreIpcServer::setActiveComputer(const QString &active, const QString &computers)
+{
+  m_activeComputer = active;
+  m_computers = computers;
+  const auto message = activeComputerMessage();
+  const auto equals = message.indexOf('=');
+  broadcastCommand(message.left(equals), message.mid(equals + 1));
+}
+
+QString CoreIpcServer::activeComputerMessage() const
+{
+  // "activeComputer=<active>;<name|platform>,<name|platform>"
+  return QStringLiteral("activeComputer=%1;%2").arg(m_activeComputer, m_computers);
 }
 
 } // namespace deskflow::core::ipc

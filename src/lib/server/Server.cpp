@@ -126,6 +126,9 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   // set initial configuration
   setConfig(config);
 
+  // let the gui know the cursor starts on the server
+  notifyActiveComputer();
+
   // If we are using libportal, we need to set the primary client first.
   // This enables the rules of the primary client. The hotkeys are then enabled in EiComputer.cpp after the rules
   // registered them.
@@ -269,6 +272,7 @@ void Server::adoptClient(BaseClientProxy *client)
   LOG_DEBUG("client \"%s\" has connected", getName(client).c_str());
   ipcSendConnectionState(deskflow::core::ConnectionState::Connected);
   sendConnectedClientsIpc();
+  notifyActiveComputer();
 
   // send configuration options to client
   sendOptions(client);
@@ -324,6 +328,61 @@ void Server::sendConnectedClientsIpc() const
     }
   }
   ipcSendToClient("connectedClients", clientList.join(","));
+}
+
+void Server::switchToComputerByName(const std::string &computer)
+{
+  std::string name = m_config->getCanonicalName(computer);
+  if (name.empty()) {
+    name = computer;
+  }
+
+  const auto index = m_clients.find(name);
+  if (index == m_clients.end()) {
+    LOG_WARN("can't switch to \"%s\", computer is not connected", computer.c_str());
+    return;
+  }
+  if (index->second == m_active) {
+    LOG_DEBUG("already on \"%s\"", name.c_str());
+    return;
+  }
+
+  // land in the middle of the target computer's screen. the remembered jump position is
+  // usually the edge the cursor last left through, where the slightest movement would
+  // carry it straight back.
+  BaseClientProxy *target = index->second;
+  int32_t x;
+  int32_t y;
+  int32_t w;
+  int32_t h;
+  target->getShape(x, y, w, h);
+
+  m_active->setJumpCursorPos(m_x, m_y);
+  LOG_INFO("switching to \"%s\" on request", name.c_str());
+  switchComputer(target, x + w / 2, y + h / 2, false);
+}
+
+void Server::notifyActiveComputer() const
+{
+  if (m_active == nullptr) {
+    return;
+  }
+
+  const auto active = getName(m_active);
+  std::string computers;
+  for (const auto &[name, client] : m_clients) {
+    if (!computers.empty()) {
+      computers += ",";
+    }
+    computers += name + "|" + client->getPlatform();
+  }
+
+  ipcSendActiveComputer(QString::fromStdString(active), QString::fromStdString(computers));
+  for (const auto &[name, client] : m_clients) {
+    if (client != m_primaryClient) {
+      client->activeComputerChanged(active, computers);
+    }
+  }
 }
 
 std::string Server::getName(const BaseClientProxy *client) const
@@ -505,6 +564,7 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
 
     auto *info = new Server::SwitchToComputerInfo(m_active->getName());
     m_events->addEvent(Event(EventTypes::ServerComputerSwitched, this, info));
+    notifyActiveComputer();
   } else {
     m_active->mouseMove(x, y);
   }
@@ -1297,6 +1357,7 @@ void Server::handleClientDisconnected(BaseClientProxy *client)
   using enum deskflow::core::ConnectionState;
   ipcSendConnectionState(m_clients.size() <= 1 ? Listening : Connected);
   sendConnectedClientsIpc();
+  notifyActiveComputer();
 
   delete client;
 }

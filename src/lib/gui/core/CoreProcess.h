@@ -48,6 +48,9 @@ public:
   void clearSettings();
   void retryDaemon();
 
+  //! Ask the core to move the cursor to \p computer.
+  void requestSwitchToComputer(const QString &computer);
+
   // getters
   Settings::CoreMode mode() const
   {
@@ -94,6 +97,12 @@ Q_SIGNALS:
   void retryIn(int seconds);
   void peerFingerprint(const QString &fingerprint);
   void missingKeyboardLayouts(const QString &layouts);
+  /**
+   * The computer that has the cursor changed.
+   * \param active Name of that computer, empty when unknown (e.g. not connected).
+   * \param computers Connected computers as "name|platform" strings.
+   */
+  void activeComputerChanged(const QString &active, const QStringList &computers);
 
 private Q_SLOTS:
   void onProcessFinished(int exitCode, QProcess::ExitStatus);

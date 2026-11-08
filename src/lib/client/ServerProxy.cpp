@@ -345,6 +345,11 @@ void ServerProxy::requestRefuseConnection(deskflow::core::ConnectionRefusal reas
   ));
 }
 
+void ServerProxy::requestSwitchToComputer(const std::string &computer)
+{
+  LOG_WARN("can't switch to \"%s\", the server doesn't support switch requests", computer.c_str());
+}
+
 void ServerProxy::onInfoChanged()
 {
   // ignore mouse motion until we receive acknowledgment of our info

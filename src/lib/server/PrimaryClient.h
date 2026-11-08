@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "deskflow/ActiveComputer.h"
 #include "server/BaseClientProxy.h"
 
 namespace deskflow {
@@ -137,6 +138,11 @@ public:
   bool isPrimary() const override
   {
     return true;
+  }
+
+  std::string getPlatform() const override
+  {
+    return deskflow::localPlatformName();
   }
 
 private:

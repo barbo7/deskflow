@@ -599,6 +599,18 @@ Vuoi connetterti al server?
         <translation>Disconnetti</translation>
     </message>
     <message>
+        <source>In use: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Switch to %1</source>
+        <translation type="unfinished">Passa a %1</translation>
+    </message>
+    <message>
+        <source>%1 - in use: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>%1 Connection Error</source>
         <translation>Errore di connessione %1</translation>
     </message>

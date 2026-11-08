@@ -20,6 +20,8 @@ public:
   explicit CoreIpcClient(QObject *parent = nullptr);
 
   void sendStop();
+  void sendSwitchTo(const QString &computer);
+  void requestActiveComputer();
 
 Q_SIGNALS:
   void commandReceived(const QString &command, const QString &args);

@@ -12,3 +12,10 @@
 
 void ipcSendToClient(const QString &command, const QString &args = "");
 void ipcSendConnectionState(deskflow::core::ConnectionState state);
+
+/**
+ * Tell the gui which computer has the cursor, and which computers are connected.
+ * \param active Name of the computer that has the cursor (empty if unknown).
+ * \param computers Connected computers as "name|platform" pairs joined by ",".
+ */
+void ipcSendActiveComputer(const QString &active, const QString &computers);

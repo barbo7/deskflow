@@ -14,6 +14,7 @@
 #include "client/ServerProxy.h"
 #include "client/ServerProxy1_7.h"
 #include "client/ServerProxy1_8.h"
+#include "client/ServerProxy1_9.h"
 #include "common/NetworkProtocol.h"
 #include "common/Settings.h"
 #include "deskflow/Clipboard.h"
@@ -483,6 +484,9 @@ bool Client::setupComputer(int16_t protocolMinor)
   case 8:
     m_server = new ServerProxy1_8(this, m_stream, m_events);
     break;
+  case 9:
+    m_server = new ServerProxy1_9(this, m_stream, m_events);
+    break;
   default:
     break;
   }
@@ -766,4 +770,18 @@ void Client::bindNetworkInterface(IDataSocket *socket) const
   bindAddress.resolve();
 
   socket->bind(bindAddress);
+}
+
+void Client::requestSwitchToComputer(const std::string &computer)
+{
+  if (m_server == nullptr) {
+    LOG_WARN("can't switch to \"%s\", not connected to a server", computer.c_str());
+    return;
+  }
+  m_server->requestSwitchToComputer(computer);
+}
+
+void Client::activeComputerChanged(const std::string &active, const std::string &computers) const
+{
+  ipcSendActiveComputer(QString::fromStdString(active), QString::fromStdString(computers));
 }

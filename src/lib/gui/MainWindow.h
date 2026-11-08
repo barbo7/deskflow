@@ -26,6 +26,8 @@
 #endif
 
 class QAction;
+class QHBoxLayout;
+class QLabel;
 class QMenu;
 class QLocalServer;
 
@@ -116,6 +118,11 @@ private:
   void setupTrayIcon();
   void applyConfig();
   void setTrayIcon();
+  void handleActiveComputerChanged(const QString &active, const QStringList &computers);
+  void updateSwitchMenu();
+  void setupActiveComputerBar();
+  void updateActiveComputerBar();
+  bool setActiveComputerTrayIcon();
   void handleUnrecognisedClient(const QString &clientName);
   void handleConnectionRefused(deskflow::core::ConnectionRefusal reason);
   void handlePeerFingerprint(const QString &fingerprint);
@@ -179,6 +186,14 @@ private:
   QStringList m_checkedClients;
   QStringList m_checkedServers;
   QSystemTrayIcon *m_trayIcon = nullptr;
+  QMenu *m_trayMenu = nullptr;
+  QString m_activeComputer;
+  QStringList m_computers; // "name|platform"
+  QList<QAction *> m_switchActions;
+  QWidget *m_activeComputerBar = nullptr;
+  QLabel *m_activeComputerIcon = nullptr;
+  QLabel *m_activeComputerLabel = nullptr;
+  QHBoxLayout *m_activeComputerButtons = nullptr;
   QLocalServer *m_guiDupeChecker = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;
 

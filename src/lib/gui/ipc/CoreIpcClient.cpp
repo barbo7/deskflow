@@ -22,6 +22,16 @@ void CoreIpcClient::sendStop()
   sendMessage(QStringLiteral("stop"));
 }
 
+void CoreIpcClient::sendSwitchTo(const QString &computer)
+{
+  sendMessage(QStringLiteral("switchTo=%1").arg(computer));
+}
+
+void CoreIpcClient::requestActiveComputer()
+{
+  sendMessage(QStringLiteral("getActiveComputer"));
+}
+
 void CoreIpcClient::processCommand(const QString &command, const QStringList &parts)
 {
   const auto args = parts.size() >= 2 ? parts.at(1) : QString();

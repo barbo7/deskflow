@@ -15,6 +15,7 @@
 #include "common/ExitCodes.h"
 #include "common/PlatformInfo.h"
 #include "common/Settings.h"
+#include "deskflow/ActiveComputer.h"
 #include "deskflow/Computer.h"
 #include "deskflow/DisplayException.h"
 #include "deskflow/ipc/CoreIpc.h"
@@ -225,6 +226,7 @@ void ClientApp::handleClientDisconnected()
   m_retryCount = 0;
   LOG_DEBUG("disconnected from server");
   ipcSendConnectionState(deskflow::core::ConnectionState::Disconnected);
+  ipcSendActiveComputer({}, {});
   if (!m_suspended) {
     scheduleClientRestart(retryTime());
   }
@@ -325,12 +327,24 @@ int ClientApp::mainLoop()
   // start client, etc
   startNode();
 
+  // a switch requested from the gui (tray menu) via core ipc; forwarded to the server
+  getEvents()->addHandler(
+      EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget(),
+      [this](const auto &e) {
+        const auto *info = dynamic_cast<const deskflow::SwitchRequestInfo *>(e.getDataObject());
+        if (info != nullptr && m_client != nullptr) {
+          m_client->requestSwitchToComputer(info->m_computer);
+        }
+      }
+  );
+
   // run event loop.  if startClient() failed we're supposed to retry
   // later.  the timer installed by startClient() will take care of
   // that.
   int exitCode = getEvents()->loop();
 
   // close down
+  getEvents()->removeHandler(EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget());
   LOG_DEBUG("stopping client");
   stopClient();
   LOG_INFO("stopped client");

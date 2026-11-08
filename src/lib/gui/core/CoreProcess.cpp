@@ -470,8 +470,10 @@ void CoreProcess::start(std::optional<ProcessMode> processModeOption)
               m_coreIpcClient, &ipc::CoreIpcClient::commandReceived, this, &CoreProcess::onCoreIpcMessageReceived,
               Qt::QueuedConnection
           );
-          connect(m_coreIpcClient, &ipc::CoreIpcClient::connected, this, [] {
+          connect(m_coreIpcClient, &ipc::CoreIpcClient::connected, this, [this] {
             qDebug("connected to core ipc server");
+            if (m_coreIpcClient)
+              m_coreIpcClient->requestActiveComputer();
           });
           connect(m_coreIpcClient, &ipc::CoreIpcClient::connectionFailed, this, [] {
             qWarning("failed to establish core ipc connection");
@@ -608,6 +610,10 @@ void CoreProcess::setConnectionState(ConnectionState state)
 
   m_connectionState = state;
   Q_EMIT connectionStateChanged(state);
+
+  if (state == ConnectionState::Disconnected) {
+    Q_EMIT activeComputerChanged({}, {});
+  }
 }
 
 void CoreProcess::setProcessState(ProcessState state)
@@ -622,6 +628,19 @@ void CoreProcess::setProcessState(ProcessState state)
   );
   m_processState = state;
   Q_EMIT processStateChanged(state);
+
+  if (state != ProcessState::Started) {
+    Q_EMIT activeComputerChanged({}, {});
+  }
+}
+
+void CoreProcess::requestSwitchToComputer(const QString &computer)
+{
+  if (m_coreIpcClient == nullptr) {
+    qWarning("can't switch computer, not connected to the core");
+    return;
+  }
+  m_coreIpcClient->sendSwitchTo(computer);
 }
 
 void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString &args)
@@ -635,6 +654,12 @@ void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString
       return;
     }
     setConnectionState(state);
+  } else if (command == "activeComputer") {
+    // "<active>;<name|platform>,<name|platform>"
+    const auto separator = args.indexOf(';');
+    const auto active = separator < 0 ? args : args.left(separator);
+    const auto list = separator < 0 ? QString() : args.mid(separator + 1);
+    Q_EMIT activeComputerChanged(active, list.isEmpty() ? QStringList() : list.split(','));
   } else if (command == "connectedClients") {
     const auto clients = args.isEmpty() ? QStringList() : args.split(",");
     Q_EMIT connectedClientsChanged(clients);

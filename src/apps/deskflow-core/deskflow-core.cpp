@@ -125,6 +125,11 @@ int main(int argc, char **argv)
   QObject::connect(
       ipcServer, &deskflow::core::ipc::IpcServer::stopProcessRequested, coreApp, &App::quit, Qt::DirectConnection
   );
+  QObject::connect(
+      ipcServer, &deskflow::core::ipc::CoreIpcServer::switchToComputerRequested, coreApp,
+      [coreApp](const QString &computer) { coreApp->requestSwitchToComputer(computer.toStdString()); },
+      Qt::DirectConnection
+  );
   ipcServer->listen();
 
   QThread coreThread;

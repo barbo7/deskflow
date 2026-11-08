@@ -10,6 +10,8 @@
 #include "base/IEventQueue.h"
 #include "client/Client.h"
 #include "client/ServerProxy.h"
+#include "client/ServerProxy1_9.h"
+#include "deskflow/ActiveComputer.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/ProtocolTypes.h"
 #include "io/IStream.h"
@@ -23,6 +25,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -79,8 +82,14 @@ public:
     return static_cast<uint32_t>(bytesToRead);
   }
 
-  void write(const void *, uint32_t) override
+  void write(const void *buffer, uint32_t size) override
   {
+    m_written.append(static_cast<const char *>(buffer), size);
+  }
+
+  std::string takeWritten()
+  {
+    return std::exchange(m_written, {});
   }
 
   void flush() override
@@ -117,6 +126,7 @@ public:
 
 private:
   std::deque<std::string> m_chunks;
+  std::string m_written;
   bool m_inputShutdown = false;
 };
 
@@ -246,6 +256,29 @@ public:
   }
 };
 
+class TestServerProxy1_9 : public ServerProxy1_9
+{
+public:
+  using ServerProxy1_9::ServerProxy1_9;
+
+  void parseHandshake(const uint8_t *code)
+  {
+    (void)parseHandshakeMessage(code);
+  }
+};
+
+// a length-prefixed protocol string, as ProtocolUtil writes %s
+std::string protocolString(const std::string &value)
+{
+  const auto size = static_cast<uint32_t>(value.size());
+  std::string out;
+  out.push_back(static_cast<char>((size >> 24) & 0xff));
+  out.push_back(static_cast<char>((size >> 16) & 0xff));
+  out.push_back(static_cast<char>((size >> 8) & 0xff));
+  out.push_back(static_cast<char>(size & 0xff));
+  return out + value;
+}
+
 Client *undereferenceableClient()
 {
   // These paths must queue cleanup without calling through to Client.
@@ -326,6 +359,41 @@ void ServerProxyTests::parseHandshakeMessage_protocolError_queuesRefusalRequest(
   QVERIFY(request->kind() == Client::DisconnectRequest::Kind::Refuse);
   QVERIFY(request->refusalReason() == deskflow::core::ConnectionRefusal::ProtocolError);
   QCOMPARE(QString::fromUtf8(request->message()), QStringLiteral("server reported a protocol error"));
+}
+
+void ServerProxyTests::requestSwitchToComputer_before1_9_sendsNothing()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  ServerProxy proxy(undereferenceableClient(), &stream, &events);
+
+  proxy.requestSwitchToComputer("Mac");
+  QCOMPARE(stream.takeWritten(), std::string());
+}
+
+void ServerProxyTests::requestSwitchToComputer_1_9_sendsSwitchRequest()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  ServerProxy1_9 proxy(undereferenceableClient(), &stream, &events);
+  stream.takeWritten();
+
+  proxy.requestSwitchToComputer("Mac");
+  QCOMPARE(stream.takeWritten(), "DSWR" + protocolString("Mac"));
+}
+
+void ServerProxyTests::parseHandshakeMessage_1_9_sendsPlatformOnce()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  TestServerProxy1_9 proxy(undereferenceableClient(), &stream, &events);
+  stream.takeWritten();
+
+  proxy.parseHandshake(reinterpret_cast<const uint8_t *>(kMsgEBad));
+  QCOMPARE(stream.takeWritten(), "DPLT" + protocolString(deskflow::localPlatformName()));
+
+  proxy.parseHandshake(reinterpret_cast<const uint8_t *>(kMsgEBad));
+  QCOMPARE(stream.takeWritten(), std::string());
 }
 
 QTEST_MAIN(ServerProxyTests)

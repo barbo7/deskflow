@@ -571,6 +571,18 @@ Do you want to connect to the server?
         <translation>Отключиться</translation>
     </message>
     <message>
+        <source>In use: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Switch to %1</source>
+        <translation type="unfinished">Переключиться на %1</translation>
+    </message>
+    <message>
+        <source>%1 - in use: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&lt;p&gt;Failed to connect to the server &apos;%1&apos;.&lt;/p&gt;&lt;p&gt;A Client with your name is already connected to the server.&lt;/p&gt;Please ensure that you&apos;re using a unique name and that only a single instance of the client process is running.&lt;/p&gt;</source>
         <translation>&lt;p&gt;Не удалось подключиться к серверу &apos;%1&apos;.&lt;/p&gt;&lt;p&gt;Клиент с таким именем уже подключен к серверу.&lt;/p&gt;Убедитесь, что вы используете уникальное имя и запущен только один процесс клиента.&lt;/p&gt;</translation>
     </message>

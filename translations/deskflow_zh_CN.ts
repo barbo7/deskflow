@@ -571,6 +571,18 @@ Do you want to connect to the server?
         <translation>断开</translation>
     </message>
     <message>
+        <source>In use: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Switch to %1</source>
+        <translation type="unfinished">切换到 %1</translation>
+    </message>
+    <message>
+        <source>%1 - in use: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&lt;p&gt;Failed to connect to the server &apos;%1&apos;.&lt;/p&gt;&lt;p&gt;A Client with your name is already connected to the server.&lt;/p&gt;Please ensure that you&apos;re using a unique name and that only a single instance of the client process is running.&lt;/p&gt;</source>
         <translation>&lt;p&gt;连接到服务器“%1”失败。&lt;/p&gt;&lt;p&gt;一个同名的客户端已连接到服务器。&lt;/p&gt;请确保您使用的名称唯一，且只有一个客户端进程实例在运行。&lt;/p&gt;</translation>
     </message>

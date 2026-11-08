@@ -45,7 +45,7 @@ static const int16_t kProtocolMajorVersion = 1;
  * @note When incrementing the minor version, the Deskflow application version should also increment
  * @since Protocol version 1.0
  */
-static const int16_t kProtocolMinorVersion = 8;
+static const int16_t kProtocolMinorVersion = 9;
 
 /**
  * @brief Default TCP port for Deskflow connections
@@ -1161,6 +1161,54 @@ extern const char *const kMsgDSecureInputNotification;
  * @since Protocol version 1.8
  */
 extern const char *const kMsgDLanguageSynchronisation;
+
+/**
+ * @brief Active computer notification
+ *
+ * **Message Code**: `"DACT"`
+ * **Direction**: Primary → Secondary
+ * **Format**: `"DACT%s%s"`
+ * **Parameters**:
+ * - `$1`: Name of the computer that currently has the cursor (string)
+ * - `$2`: All connected computers as `name|platform` pairs joined by `,` (string)
+ *
+ * Sent whenever the cursor switches computers, and once after a client connects,
+ * so every computer can show which one is in use.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDActiveComputer;
+
+/**
+ * @brief Switch request
+ *
+ * **Message Code**: `"DSWR"`
+ * **Direction**: Secondary → Primary
+ * **Format**: `"DSWR%s"`
+ * **Parameters**:
+ * - `$1`: Name of the computer the cursor should move to (string)
+ *
+ * Asks the server to move the cursor to the named computer, the same as
+ * a `switchToScreen(name)` hotkey on the server.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDSwitchRequest;
+
+/**
+ * @brief Platform announcement
+ *
+ * **Message Code**: `"DPLT"`
+ * **Direction**: Secondary → Primary
+ * **Format**: `"DPLT%s"`
+ * **Parameters**:
+ * - `$1`: Client platform: `mac`, `windows` or `linux` (string)
+ *
+ * Sent once by the client during the handshake.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDPlatform;
 
 /** @} */ // end of protocol_system group
 

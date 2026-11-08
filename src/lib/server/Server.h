@@ -200,6 +200,12 @@ public:
   void sendConnectedClientsIpc() const;
   size_t getMaximumClipboardSizeBytes() const;
 
+  //! Move the cursor to the computer called \p computer (from the gui or a client request).
+  void switchToComputerByName(const std::string &computer);
+
+  //! Tell the gui and every 1.9+ client which computer has the cursor.
+  void notifyActiveComputer() const;
+
   //@}
 
 private:

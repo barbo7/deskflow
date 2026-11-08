@@ -10,6 +10,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 
+#include "ActiveComputerIcon.h"
 #include "Diagnostic.h"
 #include "StyleUtils.h"
 
@@ -36,6 +37,8 @@
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QFileDialog>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMenu>
@@ -82,6 +85,7 @@ MainWindow::MainWindow()
       m_networkMonitor{new NetworkMonitor(this)}
 {
   ui->setupUi(this);
+  setupActiveComputerBar();
 
   setWindowIcon(QIcon::fromTheme(kRevFqdnName));
 
@@ -273,6 +277,7 @@ void MainWindow::connectSlots()
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
 
   connect(&m_coreProcess, &CoreProcess::connectedClientsChanged, this, &MainWindow::serverClientsChanged);
+  connect(&m_coreProcess, &CoreProcess::activeComputerChanged, this, &MainWindow::handleActiveComputerChanged);
   connect(&m_coreProcess, &CoreProcess::unrecognisedClient, this, &MainWindow::handleUnrecognisedClient);
   connect(&m_coreProcess, &CoreProcess::connectionRefused, this, &MainWindow::handleConnectionRefused);
   connect(&m_coreProcess, &CoreProcess::retryIn, this, &MainWindow::updateTimeoutDelay);
@@ -690,9 +695,203 @@ void MainWindow::setupTrayIcon()
   trayMenu->insertSeparator(m_actionMinimize);
   trayMenu->insertSeparator(m_actionTrayQuit);
   m_trayIcon->setContextMenu(trayMenu);
+  m_trayMenu = trayMenu;
 
   setTrayIcon();
   m_trayIcon->show();
+}
+
+void MainWindow::handleActiveComputerChanged(const QString &active, const QStringList &computers)
+{
+  qInfo().noquote() << "active computer:" << (active.isEmpty() ? QStringLiteral("(none)") : active)
+                    << "computers:" << computers.join(QStringLiteral(", "));
+  if (active == m_activeComputer && computers == m_computers)
+    return;
+
+  m_activeComputer = active;
+  m_computers = computers;
+  updateSwitchMenu();
+  updateActiveComputerBar();
+  setTrayIcon();
+}
+
+void MainWindow::updateSwitchMenu()
+{
+  if (m_trayMenu == nullptr)
+    return;
+
+  for (auto *action : std::as_const(m_switchActions)) {
+    m_trayMenu->removeAction(action);
+    action->deleteLater();
+  }
+  m_switchActions.clear();
+
+  // nothing to switch between until another computer is connected
+  if (m_activeComputer.isEmpty() || m_computers.size() < 2)
+    return;
+
+  auto describe = [](const QString &name, const QString &platform) {
+    const auto label = platformLabel(platform);
+    return label.isEmpty() ? name : QStringLiteral("%1 (%2)").arg(name, label);
+  };
+
+  QString activePlatform;
+  for (const auto &entry : std::as_const(m_computers)) {
+    if (entry.section('|', 0, 0) == m_activeComputer)
+      activePlatform = entry.section('|', 1);
+  }
+
+  auto *header = new QAction(tr("In use: %1").arg(describe(m_activeComputer, activePlatform)), m_trayMenu);
+  header->setEnabled(false);
+  m_switchActions.append(header);
+
+  for (const auto &entry : std::as_const(m_computers)) {
+    const auto name = entry.section('|', 0, 0);
+    const auto platform = entry.section('|', 1);
+    auto *action = new QAction(tr("Switch to %1").arg(describe(name, platform)), m_trayMenu);
+    action->setCheckable(true);
+    action->setChecked(name == m_activeComputer);
+    connect(action, &QAction::triggered, this, [this, action, name] {
+      if (name == m_activeComputer) {
+        action->setChecked(true);
+        return;
+      }
+      qInfo().noquote() << "switch to computer requested from tray menu:" << name;
+      m_coreProcess.requestSwitchToComputer(name);
+    });
+    m_switchActions.append(action);
+  }
+
+  auto *separator = new QAction(m_trayMenu);
+  separator->setSeparator(true);
+  m_switchActions.append(separator);
+
+  const auto existing = m_trayMenu->actions();
+  m_trayMenu->insertActions(existing.isEmpty() ? nullptr : existing.first(), m_switchActions);
+}
+
+void MainWindow::setupActiveComputerBar()
+{
+  // a strip under the computer name: which computer has the cursor, plus a button per other
+  // computer. the tray menu does the same, but the tray icon can be hidden (e.g. behind the
+  // macOS menu bar notch).
+  m_activeComputerBar = new QWidget(this);
+  auto *layout = new QHBoxLayout(m_activeComputerBar);
+  layout->setContentsMargins(3, 2, 3, 2);
+
+  m_activeComputerIcon = new QLabel(m_activeComputerBar);
+  m_activeComputerLabel = new QLabel(m_activeComputerBar);
+  auto font = m_activeComputerLabel->font();
+  font.setBold(true);
+  m_activeComputerLabel->setFont(font);
+
+  layout->addWidget(m_activeComputerIcon);
+  layout->addWidget(m_activeComputerLabel);
+  layout->addStretch();
+  m_activeComputerButtons = new QHBoxLayout();
+  layout->addLayout(m_activeComputerButtons);
+
+  m_activeComputerBar->hide();
+  if (auto *mainLayout = qobject_cast<QBoxLayout *>(centralWidget()->layout()); mainLayout != nullptr) {
+    mainLayout->insertWidget(1, m_activeComputerBar);
+  }
+}
+
+void MainWindow::updateActiveComputerBar()
+{
+  if (m_activeComputerBar == nullptr)
+    return;
+
+  const bool show = !m_activeComputer.isEmpty() && m_computers.size() >= 2;
+
+  // clear the old buttons
+  while (auto *item = m_activeComputerButtons->takeAt(0)) {
+    if (auto *widget = item->widget())
+      widget->deleteLater();
+    delete item;
+  }
+
+  if (show) {
+    auto describe = [](const QString &name, const QString &platform) {
+      const auto label = platformLabel(platform);
+      return label.isEmpty() ? name : QStringLiteral("%1 (%2)").arg(name, label);
+    };
+
+    for (const auto &entry : std::as_const(m_computers)) {
+      const auto name = entry.section('|', 0, 0);
+      const auto platform = entry.section('|', 1);
+      if (name == m_activeComputer) {
+        const auto ratio = devicePixelRatioF();
+        auto pixmap = QPixmap::fromImage(drawActiveComputerIcon(
+            platform, name, palette().color(QPalette::WindowText), static_cast<int>(18 * ratio)
+        ));
+        pixmap.setDevicePixelRatio(ratio);
+        m_activeComputerIcon->setPixmap(pixmap);
+        m_activeComputerLabel->setText(tr("In use: %1").arg(describe(name, platform)));
+        continue;
+      }
+
+      auto *button = new QPushButton(tr("Switch to %1").arg(describe(name, platform)), m_activeComputerBar);
+      connect(button, &QPushButton::clicked, this, [this, name] {
+        qInfo().noquote() << "switch to computer requested from main window:" << name;
+        m_coreProcess.requestSwitchToComputer(name);
+      });
+      m_activeComputerButtons->addWidget(button);
+    }
+  }
+
+  // isHidden, not isVisible: the main window itself may be hidden in the tray
+  if (m_activeComputerBar->isHidden() != show)
+    return;
+
+  m_activeComputerBar->setVisible(show);
+  // the window has a fixed size while the log is collapsed, so grow or shrink it to fit
+  if (!Settings::value(Settings::Gui::LogExpanded).toBool() && isVisible()) {
+    setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    setMinimumSize(0, 0);
+    adjustSize();
+    setFixedSize(size());
+  }
+}
+
+bool MainWindow::setActiveComputerTrayIcon()
+{
+  if (m_activeComputer.isEmpty() || m_computers.size() < 2) {
+    m_trayIcon->setToolTip(kAppName);
+    return false;
+  }
+
+  QString platform;
+  for (const auto &entry : std::as_const(m_computers)) {
+    if (entry.section('|', 0, 0) == m_activeComputer)
+      platform = entry.section('|', 1);
+  }
+
+  QColor color = Qt::black;
+  if (deskflow::platform::isWindows()) {
+    QSettings settings(
+        QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+        QSettings::NativeFormat
+    );
+    const bool lightTaskbar = settings.value(QStringLiteral("SystemUsesLightTheme"), 0).toBool();
+    color = lightTaskbar ? Qt::black : Qt::white;
+  } else if (!deskflow::platform::isMac()) {
+    color = isDarkMode() ? Qt::white : Qt::black;
+  }
+
+  QIcon icon;
+  for (const int size : {16, 22, 32, 44, 64}) {
+    icon.addPixmap(QPixmap::fromImage(drawActiveComputerIcon(platform, m_activeComputer, color, size)));
+  }
+  // on macOS a mask icon becomes a template image that follows the menu bar's light/dark look
+  icon.setIsMask(deskflow::platform::isMac());
+  m_trayIcon->setIcon(icon);
+
+  const auto label = platformLabel(platform);
+  m_trayIcon->setToolTip(
+      tr("%1 - in use: %2").arg(kAppName, label.isEmpty() ? m_activeComputer : QStringLiteral("%1 (%2)").arg(m_activeComputer, label))
+  );
+  return true;
 }
 
 void MainWindow::applyConfig()
@@ -731,6 +930,9 @@ void MainWindow::saveSettings() const
 
 void MainWindow::setTrayIcon()
 {
+  if (setActiveComputerTrayIcon())
+    return;
+
   static const auto fallbackPath = QStringLiteral(":/icons/%1-%2/apps/64/%3");
 
   QString themeIcon = kRevFqdnName;

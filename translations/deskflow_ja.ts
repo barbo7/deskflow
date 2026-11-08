@@ -571,6 +571,18 @@ Do you want to connect to the server?
         <translation>切断</translation>
     </message>
     <message>
+        <source>In use: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Switch to %1</source>
+        <translation type="unfinished">%1 に切り替える</translation>
+    </message>
+    <message>
+        <source>%1 - in use: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&lt;p&gt;Failed to connect to the server &apos;%1&apos;.&lt;/p&gt;&lt;p&gt;A Client with your name is already connected to the server.&lt;/p&gt;Please ensure that you&apos;re using a unique name and that only a single instance of the client process is running.&lt;/p&gt;</source>
         <translation>&lt;p&gt;サーバー &apos;%1&apos; への接続に失敗しました。&lt;/p&gt;&lt;p&gt;同じ名前のクライアントがサーバーに接続済です。&lt;/p&gt;&lt;p&gt;名前の重複がないことと、クライアントプロセスが多重起動していない事を確認してください。&lt;/p&gt;</translation>
     </message>

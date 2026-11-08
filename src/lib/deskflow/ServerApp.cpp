@@ -14,6 +14,7 @@
 #include "common/ExitCodes.h"
 #include "common/PlatformInfo.h"
 #include "common/Settings.h"
+#include "deskflow/ActiveComputer.h"
 #include "deskflow/App.h"
 #include "deskflow/Computer.h"
 #include "deskflow/DisplayException.h"
@@ -547,6 +548,17 @@ int ServerApp::mainLoop()
     resetServer();
   });
 
+  // a switch requested from the gui (tray menu) via core ipc
+  getEvents()->addHandler(
+      EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget(),
+      [this](const auto &e) {
+        const auto *info = dynamic_cast<const deskflow::SwitchRequestInfo *>(e.getDataObject());
+        if (info != nullptr && m_server != nullptr) {
+          m_server->switchToComputerByName(info->m_computer);
+        }
+      }
+  );
+
   // run event loop.  if startServer() failed we're supposed to retry
   // later.  the timer installed by startServer() will take care of
   // that.
@@ -556,6 +568,7 @@ int ServerApp::mainLoop()
   LOG_DEBUG("stopping server");
   getEvents()->removeHandler(EventTypes::ServerAppForceReconnect, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::ServerAppReloadConfig, getEvents()->getSystemTarget());
+  getEvents()->removeHandler(EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget());
   cleanupServer();
   LOG_INFO("stopped server");
 

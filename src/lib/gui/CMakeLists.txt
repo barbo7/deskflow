@@ -15,6 +15,8 @@ endif()
 
 add_library(${target} STATIC
   ${platform_sources}
+  ActiveComputerIcon.cpp
+  ActiveComputerIcon.h
   ComputerSetupModel.cpp
   ComputerSetupModel.h
   Diagnostic.cpp

@@ -19,6 +19,9 @@ private Q_SLOTS:
   void handleKeepAliveAlarm_timeout_queuesDisconnectRequest();
   void handleData_incompleteMessage_queuesDisconnectRequest();
   void parseHandshakeMessage_protocolError_queuesRefusalRequest();
+  void requestSwitchToComputer_before1_9_sendsNothing();
+  void requestSwitchToComputer_1_9_sendsSwitchRequest();
+  void parseHandshakeMessage_1_9_sendsPlatformOnce();
 
 private:
   Log m_log;

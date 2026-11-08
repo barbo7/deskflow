@@ -13,6 +13,7 @@
 #include "base/LogOutputters.h"
 #include "common/ExitCodes.h"
 #include "common/Settings.h"
+#include "deskflow/ActiveComputer.h"
 #include "deskflow/DeskflowException.h"
 #include "mt/ThreadException.h"
 
@@ -166,6 +167,15 @@ void App::handleComputerError() const
 {
   LOG_CRIT("error on computer");
   getEvents()->addEvent(Event(EventTypes::Quit));
+}
+
+void App::requestSwitchToComputer(const std::string &computer) const
+{
+  // EventQueue::addEvent is thread safe; the handler runs on the event thread.
+  LOG_DEBUG("switch to computer \"%s\" requested", computer.c_str());
+  getEvents()->addEvent(Event(
+      EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget(), new deskflow::SwitchRequestInfo(computer)
+  ));
 }
 
 void App::quit() const

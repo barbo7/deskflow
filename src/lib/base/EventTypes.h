@@ -158,6 +158,11 @@ enum class EventTypes : uint32_t
   ServerAppForceReconnect,
   ServerAppResetServer,
 
+  /** Sent to the app's system target to ask the server (or, on a client, the server it is
+      connected to) to move the cursor to a computer. The data is a pointer to SwitchRequestInfo.
+  */
+  AppSwitchToComputerRequest,
+
   /// This event is sent when key is down. Event data is a pointer to KeyInfo (count == 1)
   KeyStateKeyDown,
   /// This event is sent when key is up. Event data is a pointer to KeyInfo (count == 1)
