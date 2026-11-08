@@ -22,6 +22,7 @@ private Q_SLOTS:
   void requestSwitchToComputer_before1_9_sendsNothing();
   void requestSwitchToComputer_1_9_sendsSwitchRequest();
   void parseHandshakeMessage_1_9_sendsPlatformOnce();
+  void requestRoleSwap_1_9_sendsSwapRequest();
 
 private:
   Log m_log;

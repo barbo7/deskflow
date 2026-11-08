@@ -42,6 +42,7 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   Computer.h
   DeskflowException.cpp
   DeskflowException.h
+  EdgePushAccumulator.h
   DisplayException.cpp
   DisplayException.h
   DisplayInvalidException.h

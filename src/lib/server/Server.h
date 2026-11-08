@@ -206,6 +206,15 @@ public:
   //! Tell the gui and every 1.9+ client which computer has the cursor.
   void notifyActiveComputer() const;
 
+  //! Send \p client what it needs to take over as server (1.9+ clients).
+  void sendSwapInfo(BaseClientProxy *client) const;
+
+  /*!
+  \p client wants to become the server: accept, and ask the gui to restart this
+  computer as a client of it at one of \p hosts (comma separated).
+  */
+  void handleRoleSwapRequest(BaseClientProxy *client, const std::string &hosts);
+
   //@}
 
 private:
@@ -413,6 +422,10 @@ private:
   std::string m_keyboardBroadcastingComputers;
 
   // all clients (including the primary client) indexed by name
+  // when the last role swap was accepted, to ignore repeated requests
+  Stopwatch m_roleSwapTimer;
+  bool m_roleSwapPending = false;
+
   using ClientList = std::map<std::string, BaseClientProxy *>;
   using ClientSet = std::set<BaseClientProxy *>;
   ClientList m_clients;

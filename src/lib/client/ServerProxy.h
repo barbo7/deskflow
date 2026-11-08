@@ -54,6 +54,10 @@ public:
   //! Ask the server to move the cursor to \p computer (protocol 1.9+ only).
   virtual void requestSwitchToComputer(const std::string &computer);
 
+  //! Ask the server to let this computer take over as server (protocol 1.9+ only).
+  //! \p hosts are this computer's addresses, comma separated.
+  virtual void requestRoleSwap(const std::string &hosts);
+
   //@}
 
 protected:

@@ -36,8 +36,7 @@ ServerProxy::ConnectionResult ServerProxy1_9::parseHandshakeMessage(const uint8_
     ProtocolUtil::writef(getStream(), kMsgDPlatform, &platform);
   }
 
-  if (memcmp(code, kMsgDActiveComputer, 4) == 0) {
-    activeComputer();
+  if (parseMessage1_9(code)) {
     return ConnectionResult::Okay;
   }
   return ServerProxy1_8::parseHandshakeMessage(code);
@@ -45,11 +44,43 @@ ServerProxy::ConnectionResult ServerProxy1_9::parseHandshakeMessage(const uint8_
 
 ServerProxy::ConnectionResult ServerProxy1_9::parseMessage(const uint8_t *code)
 {
-  if (memcmp(code, kMsgDActiveComputer, 4) == 0) {
-    activeComputer();
+  if (parseMessage1_9(code)) {
     return ConnectionResult::Okay;
   }
   return ServerProxy1_8::parseMessage(code);
+}
+
+bool ServerProxy1_9::parseMessage1_9(const uint8_t *code)
+{
+  if (memcmp(code, kMsgDActiveComputer, 4) == 0) {
+    activeComputer();
+    return true;
+  }
+  if (memcmp(code, kMsgDSwapInfo, 4) == 0) {
+    swapInfo();
+    return true;
+  }
+  if (memcmp(code, kMsgDSwapGo, 4) == 0) {
+    LOG_INFO("server accepted the role swap");
+    getClient()->roleSwapAccepted();
+    return true;
+  }
+  return false;
+}
+
+void ServerProxy1_9::requestRoleSwap(const std::string &hosts)
+{
+  LOG_INFO("asking the server to swap roles");
+  ProtocolUtil::writef(getStream(), kMsgDSwapRequest, &hosts);
+}
+
+void ServerProxy1_9::swapInfo()
+{
+  uint8_t edges = 0;
+  std::string config;
+  ProtocolUtil::readf(getStream(), kMsgDSwapInfo + 4, &edges, &config);
+  LOG_DEBUG("recv swap info: edges=0x%02x", edges);
+  getClient()->swapInfoReceived(edges, config);
 }
 
 void ServerProxy1_9::activeComputer()

@@ -23,6 +23,8 @@ public:
 
   std::string getPlatform() const override;
   void activeComputerChanged(const std::string &active, const std::string &computers) override;
+  void sendSwapInfo(uint32_t edges, const std::string &config) override;
+  void roleSwapAccepted() override;
 
 protected:
   bool parseHandshakeMessage(const uint8_t *code) override;

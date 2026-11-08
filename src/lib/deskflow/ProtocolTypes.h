@@ -1210,6 +1210,53 @@ extern const char *const kMsgDSwitchRequest;
  */
 extern const char *const kMsgDPlatform;
 
+/**
+ * @brief Role swap information
+ *
+ * **Message Code**: `"DSWI"`
+ * **Direction**: Primary → Secondary
+ * **Format**: `"DSWI%1i%s"`
+ * **Parameters**:
+ * - `$1`: Edges of the client that lead to the server, a DirectionMask (1 byte)
+ * - `$2`: The server configuration, as written to a config file (string)
+ *
+ * Sent after a client connects. Lets the client notice when its own mouse is pushed
+ * against an edge that leads to the server, and become the server itself with the same
+ * layout.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDSwapInfo;
+
+/**
+ * @brief Role swap request
+ *
+ * **Message Code**: `"DSRQ"`
+ * **Direction**: Secondary → Primary
+ * **Format**: `"DSRQ%s"`
+ * **Parameters**:
+ * - `$1`: The client's addresses, comma separated (string)
+ *
+ * The client's own mouse was pushed toward the server: the client asks to become the
+ * server, and the server to become a client of it at one of these addresses.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDSwapRequest;
+
+/**
+ * @brief Role swap accepted
+ *
+ * **Message Code**: `"DSGO"`
+ * **Direction**: Primary → Secondary
+ * **Format**: `"DSGO"`
+ *
+ * The server agreed to a role swap and is about to restart as a client.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDSwapGo;
+
 /** @} */ // end of protocol_system group
 
 /** @} */ // end of protocol_data group

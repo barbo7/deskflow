@@ -163,6 +163,13 @@ enum class EventTypes : uint32_t
   */
   AppSwitchToComputerRequest,
 
+  /// Sent to the app's system target when the user's own mouse was pushed against an edge
+  /// that leads to the server, asking for a role swap. No data.
+  AppRoleSwapRequest,
+
+  /// Sent to a client's event target when the server sent role swap information. No data.
+  ClientSwapInfoReceived,
+
   /// This event is sent when key is down. Event data is a pointer to KeyInfo (count == 1)
   KeyStateKeyDown,
   /// This event is sent when key is up. Event data is a pointer to KeyInfo (count == 1)

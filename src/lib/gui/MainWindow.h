@@ -121,6 +121,8 @@ private:
   void handleActiveComputerChanged(const QString &active, const QStringList &computers);
   void updateSwitchMenu();
   void setupActiveComputerBar();
+  void handleRoleSwap(const QString &role, const QString &data);
+  void startCoreWhenStopped(int attempts = 50);
   void updateActiveComputerBar();
   bool setActiveComputerTrayIcon();
   void handleUnrecognisedClient(const QString &clientName);

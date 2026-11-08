@@ -31,6 +31,7 @@
 #include "net/SecureSocket.h"
 #include "net/TCPSocket.h"
 
+#include <QByteArray>
 #include <QMetaEnum>
 
 #include <cstdlib>
@@ -784,4 +785,27 @@ void Client::requestSwitchToComputer(const std::string &computer)
 void Client::activeComputerChanged(const std::string &active, const std::string &computers) const
 {
   ipcSendActiveComputer(QString::fromStdString(active), QString::fromStdString(computers));
+}
+
+void Client::swapInfoReceived(uint32_t edges, const std::string &config)
+{
+  m_swapEdges = edges;
+  m_swapConfig = config;
+  m_events->addEvent(Event(EventTypes::ClientSwapInfoReceived, getEventTarget()));
+}
+
+void Client::roleSwapAccepted() const
+{
+  // the gui restarts this computer as the server, with the layout the server sent
+  const auto config = QByteArray::fromStdString(m_swapConfig).toBase64();
+  ipcSendToClient("roleSwap", QStringLiteral("server;%1").arg(QString::fromLatin1(config)));
+}
+
+void Client::requestRoleSwap(const std::string &hosts)
+{
+  if (m_server == nullptr) {
+    LOG_WARN("can't swap roles, not connected to a server");
+    return;
+  }
+  m_server->requestRoleSwap(hosts);
 }

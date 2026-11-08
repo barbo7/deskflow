@@ -22,6 +22,7 @@ public:
   ~ServerProxy1_9() override = default;
 
   void requestSwitchToComputer(const std::string &computer) override;
+  void requestRoleSwap(const std::string &hosts) override;
 
 protected:
   ConnectionResult parseHandshakeMessage(const uint8_t *code) override;
@@ -30,6 +31,12 @@ protected:
 private:
   //! Read a DACT message and pass it on to the client.
   void activeComputer();
+
+  //! Read a DSWI message and pass it on to the client.
+  void swapInfo();
+
+  //! Handle the messages added in 1.9; returns false if \p code isn't one of them.
+  bool parseMessage1_9(const uint8_t *code);
 
   bool m_sentPlatform = false;
 };

@@ -32,6 +32,18 @@ void ClientProxy1_9::activeComputerChanged(const std::string &active, const std:
   ProtocolUtil::writef(getStream(), kMsgDActiveComputer, &active, &computers);
 }
 
+void ClientProxy1_9::sendSwapInfo(uint32_t edges, const std::string &config)
+{
+  LOG_DEBUG("send swap info to \"%s\": edges=0x%02x", getName().c_str(), edges);
+  ProtocolUtil::writef(getStream(), kMsgDSwapInfo, static_cast<uint8_t>(edges), &config);
+}
+
+void ClientProxy1_9::roleSwapAccepted()
+{
+  LOG_DEBUG("send swap go to \"%s\"", getName().c_str());
+  ProtocolUtil::writef(getStream(), kMsgDSwapGo);
+}
+
 bool ClientProxy1_9::parseHandshakeMessage(const uint8_t *code)
 {
   return parseMessage1_9(code) || ClientProxy1_8::parseHandshakeMessage(code);
@@ -66,6 +78,18 @@ bool ClientProxy1_9::parseMessage1_9(const uint8_t *code)
     LOG_INFO("client \"%s\" asked to switch to \"%s\"", getName().c_str(), computer.c_str());
     if (auto *server = getServer(); server != nullptr) {
       server->switchToComputerByName(computer);
+    }
+    return true;
+  }
+
+  if (memcmp(code, kMsgDSwapRequest, 4) == 0) {
+    std::string hosts;
+    if (!ProtocolUtil::readf(getStream(), kMsgDSwapRequest + 4, &hosts)) {
+      return false;
+    }
+    LOG_INFO("client \"%s\" asked to take over as server", getName().c_str());
+    if (auto *server = getServer(); server != nullptr) {
+      server->handleRoleSwapRequest(this, hosts);
     }
     return true;
   }

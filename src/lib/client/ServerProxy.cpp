@@ -350,6 +350,11 @@ void ServerProxy::requestSwitchToComputer(const std::string &computer)
   LOG_WARN("can't switch to \"%s\", the server doesn't support switch requests", computer.c_str());
 }
 
+void ServerProxy::requestRoleSwap(const std::string &)
+{
+  LOG_WARN("can't swap roles, the server doesn't support it");
+}
+
 void ServerProxy::onInfoChanged()
 {
   // ignore mouse motion until we receive acknowledgment of our info

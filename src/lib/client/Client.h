@@ -196,6 +196,21 @@ public:
   //! Called by the server proxy when the server says which computer has the cursor.
   void activeComputerChanged(const std::string &active, const std::string &computers) const;
 
+  //! Called by the server proxy with what's needed to take over as server.
+  void swapInfoReceived(uint32_t edges, const std::string &config);
+
+  //! Called by the server proxy when the server accepted a role swap.
+  void roleSwapAccepted() const;
+
+  //! Ask the server to let this computer take over as server.
+  void requestRoleSwap(const std::string &hosts);
+
+  //! The DirectionMask of this computer's edges that lead to the server.
+  uint32_t swapEdges() const
+  {
+    return m_swapEdges;
+  }
+
 private:
   void saveRelativeRestorePosition();
   void sendClipboard(ClipboardID);
@@ -235,6 +250,8 @@ private:
   ServerProxy *m_server = nullptr;
   bool m_ready = false;
   bool m_active = false;
+  uint32_t m_swapEdges = 0;
+  std::string m_swapConfig;
   bool m_suspended = false;
   bool m_connectOnResume = false;
   bool m_ownClipboard[kClipboardEnd];

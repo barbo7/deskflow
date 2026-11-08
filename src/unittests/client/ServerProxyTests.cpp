@@ -396,4 +396,15 @@ void ServerProxyTests::parseHandshakeMessage_1_9_sendsPlatformOnce()
   QCOMPARE(stream.takeWritten(), std::string());
 }
 
+void ServerProxyTests::requestRoleSwap_1_9_sendsSwapRequest()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  ServerProxy1_9 proxy(undereferenceableClient(), &stream, &events);
+  stream.takeWritten();
+
+  proxy.requestRoleSwap("192.168.1.2,10.0.0.5");
+  QCOMPARE(stream.takeWritten(), "DSRQ" + protocolString("192.168.1.2,10.0.0.5"));
+}
+
 QTEST_MAIN(ServerProxyTests)

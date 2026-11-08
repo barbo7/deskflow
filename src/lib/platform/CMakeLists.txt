@@ -177,6 +177,16 @@ elseif(UNIX)
   endif()
 endif()
 
+# watches the user's own mouse on a client, for role swaps
+list(APPEND PLATFORM_SOURCES EdgePushDetector.h)
+if(WIN32)
+  list(APPEND PLATFORM_SOURCES MSWindowsEdgePushDetector.cpp)
+elseif(APPLE)
+  list(APPEND PLATFORM_SOURCES OSXEdgePushDetector.mm)
+else()
+  list(APPEND PLATFORM_SOURCES EdgePushDetectorNull.cpp)
+endif()
+
 # wayland.h is included to check for wayland support
 add_library(platform STATIC ${PLATFORM_SOURCES})
 

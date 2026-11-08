@@ -24,6 +24,10 @@ private Q_SLOTS:
   void keyUp();
   void activeComputerChanged_data();
   void activeComputerChanged();
+  void sendSwapInfo_data();
+  void sendSwapInfo();
+  void roleSwapAccepted_data();
+  void roleSwapAccepted();
 
 private:
   Log m_log;

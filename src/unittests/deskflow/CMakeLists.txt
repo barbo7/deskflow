@@ -63,3 +63,11 @@ if(BUILD_X11_SUPPORT)
   )
 endif()
 
+
+create_test(
+  NAME EdgePushAccumulatorTests
+  DEPENDS app
+  LIBS base ${extra_libs}
+  SOURCE EdgePushAccumulatorTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/deskflow"
+)

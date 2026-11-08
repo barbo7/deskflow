@@ -42,6 +42,8 @@
 #include "platform/OSXComputer.h"
 #endif
 
+#include <QNetworkInterface>
+
 #include <memory>
 
 ClientApp::ClientApp(IEventQueue *events, const QString &processName) : App(events, processName)
@@ -227,9 +229,44 @@ void ClientApp::handleClientDisconnected()
   LOG_DEBUG("disconnected from server");
   ipcSendConnectionState(deskflow::core::ConnectionState::Disconnected);
   ipcSendActiveComputer({}, {});
+  m_edgePushDetector.reset();
   if (!m_suspended) {
     scheduleClientRestart(retryTime());
   }
+}
+
+void ClientApp::startEdgePushDetector()
+{
+  m_edgePushDetector.reset();
+  if (m_client == nullptr || m_client->swapEdges() == 0) {
+    return;
+  }
+
+  // the detector calls back from its own thread; hand over to the event thread
+  auto *events = getEvents();
+  m_edgePushDetector = deskflow::EdgePushDetector::create(m_client->swapEdges(), [events] {
+    events->addEvent(Event(EventTypes::AppRoleSwapRequest, events->getSystemTarget()));
+  });
+}
+
+void ClientApp::requestRoleSwap()
+{
+  if (m_client == nullptr) {
+    return;
+  }
+
+  // the server will connect back to us as a client, so tell it where we are
+  QStringList hosts;
+  for (const auto &address : QNetworkInterface::allAddresses()) {
+    if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback() && !address.isLinkLocal()) {
+      hosts.append(address.toString());
+    }
+  }
+  if (hosts.isEmpty()) {
+    LOG_WARN("can't swap roles, no network address found");
+    return;
+  }
+  m_client->requestRoleSwap(hosts.join(',').toStdString());
 }
 
 Client *ClientApp::openClient(const std::string &name, const NetworkAddress &address, deskflow::Computer *computer)
@@ -248,6 +285,9 @@ Client *ClientApp::openClient(const std::string &name, const NetworkAddress &add
     });
     getEvents()->addHandler(EventTypes::ClientDisconnected, client->getEventTarget(), [this](const auto &) {
       handleClientDisconnected();
+    });
+    getEvents()->addHandler(EventTypes::ClientSwapInfoReceived, client->getEventTarget(), [this](const auto &) {
+      startEdgePushDetector();
     });
 
   } catch (std::bad_alloc &ba) {
@@ -269,6 +309,8 @@ void ClientApp::closeClient(Client *client)
   getEvents()->removeHandler(ClientConnectionFailed, target);
   getEvents()->removeHandler(ClientConnectionRefused, target);
   getEvents()->removeHandler(ClientDisconnected, target);
+  getEvents()->removeHandler(ClientSwapInfoReceived, target);
+  m_edgePushDetector.reset();
   delete client;
 }
 
@@ -338,12 +380,19 @@ int ClientApp::mainLoop()
       }
   );
 
+  // the user's own mouse was pushed toward the server (from the edge push detector)
+  getEvents()->addHandler(EventTypes::AppRoleSwapRequest, getEvents()->getSystemTarget(), [this](const auto &) {
+    requestRoleSwap();
+  });
+
   // run event loop.  if startClient() failed we're supposed to retry
   // later.  the timer installed by startClient() will take care of
   // that.
   int exitCode = getEvents()->loop();
 
   // close down
+  getEvents()->removeHandler(EventTypes::AppRoleSwapRequest, getEvents()->getSystemTarget());
+  m_edgePushDetector.reset();
   getEvents()->removeHandler(EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget());
   LOG_DEBUG("stopping client");
   stopClient();

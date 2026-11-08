@@ -7,6 +7,7 @@
 #include "ClientProxyTests.h"
 
 #include "../deskflow/MockEventQueue.h"
+#include "base/DirectionTypes.h"
 #include "deskflow/AppUtil.h"
 #include "io/IStream.h"
 #include "server/ClientProxy1_0.h"
@@ -248,6 +249,44 @@ void ClientProxyTests::activeComputerChanged()
 
   ProxyUnderTest test(minor);
   test.proxy->activeComputerChanged("Barbo", "Mac|mac,Barbo|windows");
+  QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::sendSwapInfo_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.8") << 8 << QByteArray();
+  QTest::newRow("1.9") << 9 << "DSWI" + QByteArray::fromHex("04 00000004") + "conf";
+}
+
+void ClientProxyTests::sendSwapInfo()
+{
+  QFETCH(int, minor);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->sendSwapInfo(static_cast<uint32_t>(DirectionMask::RightMask), "conf");
+  QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::roleSwapAccepted_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.8") << 8 << QByteArray();
+  QTest::newRow("1.9") << 9 << QByteArray("DSGO");
+}
+
+void ClientProxyTests::roleSwapAccepted()
+{
+  QFETCH(int, minor);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->roleSwapAccepted();
   QCOMPARE(test.stream->take(), expected);
 }
 

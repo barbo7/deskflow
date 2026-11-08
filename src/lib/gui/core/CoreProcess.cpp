@@ -660,6 +660,19 @@ void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString
     const auto active = separator < 0 ? args : args.left(separator);
     const auto list = separator < 0 ? QString() : args.mid(separator + 1);
     Q_EMIT activeComputerChanged(active, list.isEmpty() ? QStringList() : list.split(','));
+  } else if (command == "roleSwap") {
+    // "client;<hosts>" or "server;<base64 server config>"
+    const auto separator = args.indexOf(';');
+    if (separator < 0) {
+      qWarning("core ipc got invalid role swap: %s", qPrintable(args));
+      return;
+    }
+    const auto role = args.left(separator);
+    auto data = args.mid(separator + 1);
+    if (role == QStringLiteral("server")) {
+      data = QString::fromUtf8(QByteArray::fromBase64(data.toLatin1()));
+    }
+    Q_EMIT roleSwapRequested(role, data);
   } else if (command == "connectedClients") {
     const auto clients = args.isEmpty() ? QStringList() : args.split(",");
     Q_EMIT connectedClientsChanged(clients);

@@ -103,6 +103,12 @@ Q_SIGNALS:
    * \param computers Connected computers as "name|platform" strings.
    */
   void activeComputerChanged(const QString &active, const QStringList &computers);
+  /**
+   * The other computer asked to swap roles.
+   * \param role "client": restart as a client of \p data (comma separated hosts);
+   *             "server": restart as the server; \p data is the layout the old server used.
+   */
+  void roleSwapRequested(const QString &role, const QString &data);
 
 private Q_SLOTS:
   void onProcessFinished(int exitCode, QProcess::ExitStatus);

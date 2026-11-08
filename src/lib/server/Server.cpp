@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <sstream>
 
 using namespace deskflow::server;
 
@@ -273,6 +274,7 @@ void Server::adoptClient(BaseClientProxy *client)
   ipcSendConnectionState(deskflow::core::ConnectionState::Connected);
   sendConnectedClientsIpc();
   notifyActiveComputer();
+  sendSwapInfo(client);
 
   // send configuration options to client
   sendOptions(client);
@@ -360,6 +362,44 @@ void Server::switchToComputerByName(const std::string &computer)
   m_active->setJumpCursorPos(m_x, m_y);
   LOG_INFO("switching to \"%s\" on request", name.c_str());
   switchComputer(target, x + w / 2, y + h / 2, false);
+}
+
+void Server::sendSwapInfo(BaseClientProxy *client) const
+{
+  using enum Direction;
+  const auto clientName = getName(client);
+  const auto serverName = getName(m_primaryClient);
+
+  // the client's edges that lead to the server
+  uint32_t edges = 0;
+  for (const auto dir : {Left, Right, Top, Bottom}) {
+    if (m_config->getNeighbor(clientName, dir, 0.5f, nullptr) == serverName) {
+      edges |= 1u << static_cast<int>(dir);
+    }
+  }
+
+  std::ostringstream config;
+  config << *m_config;
+  client->sendSwapInfo(edges, config.str());
+}
+
+void Server::handleRoleSwapRequest(BaseClientProxy *client, const std::string &hosts)
+{
+  // a swap restarts both computers' cores; ignore repeats while one is under way
+  if (m_roleSwapPending && m_roleSwapTimer.getTime() < 10.0) {
+    LOG_DEBUG("ignoring role swap request, a swap is already under way");
+    return;
+  }
+  if (hosts.empty()) {
+    LOG_WARN("ignoring role swap request from \"%s\", it sent no address", getName(client).c_str());
+    return;
+  }
+
+  LOG_INFO("\"%s\" is taking over as server, becoming its client", getName(client).c_str());
+  m_roleSwapPending = true;
+  m_roleSwapTimer.reset();
+  client->roleSwapAccepted();
+  ipcSendToClient("roleSwap", QStringLiteral("client;%1").arg(QString::fromStdString(hosts)));
 }
 
 void Server::notifyActiveComputer() const

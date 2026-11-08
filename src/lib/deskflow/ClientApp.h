@@ -10,8 +10,11 @@
 
 #include "deskflow/App.h"
 #include "net/NetworkAddress.h"
+#include "platform/EdgePushDetector.h"
 
 #include <QList>
+
+#include <memory>
 
 namespace deskflow {
 class Computer;
@@ -60,6 +63,8 @@ public:
   void handleClientFailed(const Event &e);
   void handleClientRefused(const Event &e);
   void handleClientDisconnected();
+  void startEdgePushDetector();
+  void requestRoleSwap();
   Client *openClient(const std::string &name, const NetworkAddress &address, deskflow::Computer *computer);
   void closeClient(Client *client);
   bool startClient();
@@ -91,6 +96,7 @@ private:
 
   bool m_suspended = false;
   Client *m_client = nullptr;
+  std::unique_ptr<deskflow::EdgePushDetector> m_edgePushDetector;
   deskflow::Computer *m_clientComputer = nullptr;
   QList<NetworkAddress> m_serverAddresses;
   size_t m_currentServerIndex = 0;

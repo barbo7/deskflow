@@ -68,6 +68,22 @@ public:
     (void)computers;
   }
 
+  /*!
+  Give the client what it needs to take over as server: the DirectionMask of its edges
+  that lead to the server, and the server configuration. 1.9+ clients only.
+  */
+  virtual void sendSwapInfo(uint32_t edges, const std::string &config)
+  {
+    (void)edges;
+    (void)config;
+  }
+
+  //! Tell the client its role swap request was accepted. 1.9+ clients only.
+  virtual void roleSwapAccepted()
+  {
+    // do nothing
+  }
+
   //@}
 
   // IComputer

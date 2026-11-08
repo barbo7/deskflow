@@ -36,6 +36,8 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QDesktopServices>
+#include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -51,6 +53,7 @@
 #include <QRegularExpressionValidator>
 #include <QScreen>
 #include <QScrollBar>
+#include <QTimer>
 
 #include <memory>
 
@@ -278,6 +281,7 @@ void MainWindow::connectSlots()
 
   connect(&m_coreProcess, &CoreProcess::connectedClientsChanged, this, &MainWindow::serverClientsChanged);
   connect(&m_coreProcess, &CoreProcess::activeComputerChanged, this, &MainWindow::handleActiveComputerChanged);
+  connect(&m_coreProcess, &CoreProcess::roleSwapRequested, this, &MainWindow::handleRoleSwap);
   connect(&m_coreProcess, &CoreProcess::unrecognisedClient, this, &MainWindow::handleUnrecognisedClient);
   connect(&m_coreProcess, &CoreProcess::connectionRefused, this, &MainWindow::handleConnectionRefused);
   connect(&m_coreProcess, &CoreProcess::retryIn, this, &MainWindow::updateTimeoutDelay);
@@ -768,6 +772,55 @@ void MainWindow::updateSwitchMenu()
 
   const auto existing = m_trayMenu->actions();
   m_trayMenu->insertActions(existing.isEmpty() ? nullptr : existing.first(), m_switchActions);
+}
+
+void MainWindow::handleRoleSwap(const QString &role, const QString &data)
+{
+  if (role == QStringLiteral("client")) {
+    // the other computer is taking over as server: connect to it
+    qInfo().noquote() << "role swap: becoming a client of" << data;
+    ui->lineHostname->setText(data);
+    ui->rbModeClient->setChecked(true);
+  } else if (role == QStringLiteral("server")) {
+    qInfo("role swap: becoming the server");
+    // a computer that was only ever a client has no layout of its own: use the old server's
+    if (m_serverConfig.numComputers() < 2 && !data.isEmpty()) {
+      const auto path = QDir(Settings::settingsPath()).filePath(QStringLiteral("deskflow-server-swap.conf"));
+      QFile file(path);
+      if (file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+        file.write(data.toUtf8());
+        file.close();
+        Settings::setValue(Settings::Server::ExternalConfig, true);
+        Settings::setValue(Settings::Server::ExternalConfigFile, path);
+        qInfo().noquote() << "role swap: using the old server's layout from" << path;
+      } else {
+        qWarning().noquote() << "role swap: can't write" << path;
+      }
+    }
+    ui->rbModeServer->setChecked(true);
+  } else {
+    qWarning().noquote() << "role swap: unknown role" << role;
+    return;
+  }
+
+  saveSettings();
+  // changing mode stops the core; start it again in the new role once it's down
+  if (m_coreProcess.processState() != ProcessState::Stopped && m_coreProcess.processState() != ProcessState::Stopping)
+    m_coreProcess.stop();
+  startCoreWhenStopped();
+}
+
+void MainWindow::startCoreWhenStopped(int attempts)
+{
+  if (m_coreProcess.processState() == ProcessState::Stopped) {
+    startCore();
+    return;
+  }
+  if (attempts <= 0) {
+    qWarning("role swap: the core didn't stop in time, not restarting it");
+    return;
+  }
+  QTimer::singleShot(200, this, [this, attempts] { startCoreWhenStopped(attempts - 1); });
 }
 
 void MainWindow::setupActiveComputerBar()
