@@ -77,8 +77,7 @@ private:
     RegisterClassExW(&windowClass); // fails harmlessly if already registered
 
     // a message-only window: never shown, only receives raw input
-    HWND window =
-        CreateWindowExW(0, kWindowClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
+    HWND window = CreateWindowExW(0, kWindowClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
     if (window == nullptr) {
       started.set_value(nullptr);
       return;

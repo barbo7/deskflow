@@ -26,7 +26,9 @@ const double kPushThreshold = 80.0;
 class OSXEdgePushDetector : public EdgePushDetector
 {
 public:
-  OSXEdgePushDetector(uint32_t edges, Callback onPush) : m_accumulator(edges, kPushThreshold), m_onPush(std::move(onPush))
+  OSXEdgePushDetector(uint32_t edges, Callback onPush)
+      : m_accumulator(edges, kPushThreshold),
+        m_onPush(std::move(onPush))
   {
   }
 
