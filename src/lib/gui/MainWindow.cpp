@@ -822,9 +822,9 @@ void MainWindow::updateActiveComputerBar()
       const auto platform = entry.section('|', 1);
       if (name == m_activeComputer) {
         const auto ratio = devicePixelRatioF();
-        auto pixmap = QPixmap::fromImage(drawActiveComputerIcon(
-            platform, name, palette().color(QPalette::WindowText), static_cast<int>(18 * ratio)
-        ));
+        auto pixmap = QPixmap::fromImage(
+            drawActiveComputerIcon(platform, name, palette().color(QPalette::WindowText), static_cast<int>(18 * ratio))
+        );
         pixmap.setDevicePixelRatio(ratio);
         m_activeComputerIcon->setPixmap(pixmap);
         m_activeComputerLabel->setText(tr("In use: %1").arg(describe(name, platform)));
@@ -889,7 +889,8 @@ bool MainWindow::setActiveComputerTrayIcon()
 
   const auto label = platformLabel(platform);
   m_trayIcon->setToolTip(
-      tr("%1 - in use: %2").arg(kAppName, label.isEmpty() ? m_activeComputer : QStringLiteral("%1 (%2)").arg(m_activeComputer, label))
+      tr("%1 - in use: %2")
+          .arg(kAppName, label.isEmpty() ? m_activeComputer : QStringLiteral("%1 (%2)").arg(m_activeComputer, label))
   );
   return true;
 }
