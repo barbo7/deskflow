@@ -5,8 +5,9 @@
 name: Continuous Integration
 
 on:
+  workflow_dispatch:
   push:
-    branches: [master]
+    branches: [master, feat/active-computer-indicator]
     tags:
       - "v*"
   pull_request:
