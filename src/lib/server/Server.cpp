@@ -517,7 +517,20 @@ std::string Server::dragTarget(Direction direction) const
   const auto along = horizontal ? static_cast<float>(m_y - ay) / static_cast<float>(ah)
                                 : static_cast<float>(m_x - ax) / static_cast<float>(aw);
 
-  const auto name = m_config->getNeighbor(getName(m_active), direction, std::clamp(along, 0.0f, 0.999f), nullptr);
+  auto name = m_config->getNeighbor(getName(m_active), direction, std::clamp(along, 0.0f, 0.999f), nullptr);
+
+  // a title bar is at the top of a window, often above where the computers' monitors meet:
+  // what counts for a drag is that there's a computer on that side at all
+  if (name.empty()) {
+    const auto active = getName(m_active);
+    for (auto link = m_config->beginNeighbor(active), end = m_config->endNeighbor(active); link != end; ++link) {
+      if (link->first.getSide() == direction) {
+        name = m_config->getCanonicalName(link->second.getName());
+        break;
+      }
+    }
+  }
+
   const auto index = m_clients.find(name);
   return index != m_clients.end() && index->second->supportsHandoff() ? name : std::string();
 }

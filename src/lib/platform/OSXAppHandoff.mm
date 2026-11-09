@@ -17,7 +17,8 @@ namespace deskflow::handoff {
 
 namespace {
 
-const int kScriptTimeoutMs = 5000;
+// long enough to answer macOS asking whether Deskflow may control the browser
+const int kScriptTimeoutMs = 20000;
 
 // browsers that answer to the Chromium AppleScript dictionary
 bool isChromiumBundle(const QString &bundleId)
@@ -81,6 +82,73 @@ QString focusedDocument(AXUIElementRef app)
   return result;
 }
 
+// who owns the window under the cursor, or else the frontmost ordinary window. the accessibility
+// api can't name the focused app while a window is being dragged; the window server always can.
+pid_t frontWindowOwner()
+{
+  CGEventRef now = CGEventCreate(nullptr);
+  const CGPoint cursor = CGEventGetLocation(now);
+  CFRelease(now);
+
+  CFArrayRef windows = CGWindowListCopyWindowInfo(
+      kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID
+  );
+  if (windows == nullptr) {
+    return 0;
+  }
+
+  pid_t frontmost = 0;
+  pid_t underCursor = 0;
+  const CFIndex count = CFArrayGetCount(windows);
+  for (CFIndex i = 0; i < count && underCursor == 0; ++i) {
+    auto info = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windows, i));
+
+    int layer = -1;
+    auto layerValue = static_cast<CFNumberRef>(CFDictionaryGetValue(info, kCGWindowLayer));
+    if (layerValue == nullptr || !CFNumberGetValue(layerValue, kCFNumberIntType, &layer) || layer != 0) {
+      continue;
+    }
+
+    pid_t owner = 0;
+    auto ownerValue = static_cast<CFNumberRef>(CFDictionaryGetValue(info, kCGWindowOwnerPID));
+    if (ownerValue == nullptr || !CFNumberGetValue(ownerValue, kCFNumberIntType, &owner)) {
+      continue;
+    }
+    if (frontmost == 0) {
+      frontmost = owner;
+    }
+
+    CGRect bounds;
+    auto boundsValue = static_cast<CFDictionaryRef>(CFDictionaryGetValue(info, kCGWindowBounds));
+    if (boundsValue != nullptr && CGRectMakeWithDictionaryRepresentation(boundsValue, &bounds) &&
+        CGRectContainsPoint(CGRectInset(bounds, -2, -2), cursor)) {
+      underCursor = owner;
+    }
+  }
+  CFRelease(windows);
+  return underCursor != 0 ? underCursor : frontmost;
+}
+
+// the app in front, retained; nullptr if there's none
+AXUIElementRef copyFrontApp()
+{
+  AXUIElementRef systemWide = AXUIElementCreateSystemWide();
+  CFTypeRef focused = nullptr;
+  const auto error = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, &focused);
+  CFRelease(systemWide);
+  if (error == kAXErrorSuccess && focused != nullptr) {
+    return static_cast<AXUIElementRef>(focused);
+  }
+
+  const pid_t owner = frontWindowOwner();
+  if (owner == 0) {
+    LOG_WARN("app handoff: can't find the focused app (accessibility error %d)", static_cast<int>(error));
+    return nullptr;
+  }
+  LOG_DEBUG("app handoff: going by the window server for the app in front");
+  return AXUIElementCreateApplication(owner);
+}
+
 bool runOpen(const QStringList &arguments)
 {
   QProcess process;
@@ -97,15 +165,10 @@ CapturedApp captureFrontApp()
 
   @autoreleasepool {
     // not NSWorkspace.frontmostApplication: it goes stale without an AppKit run loop
-    AXUIElementRef systemWide = AXUIElementCreateSystemWide();
-    CFTypeRef focused = nullptr;
-    const auto error = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, &focused);
-    CFRelease(systemWide);
-    if (error != kAXErrorSuccess || focused == nullptr) {
-      LOG_WARN("app handoff: can't find the focused app (accessibility error %d)", static_cast<int>(error));
+    AXUIElementRef app = copyFrontApp();
+    if (app == nullptr) {
       return captured;
     }
-    auto app = static_cast<AXUIElementRef>(focused);
 
     pid_t pid = 0;
     AXUIElementGetPid(app, &pid);
@@ -140,7 +203,7 @@ CapturedApp captureFrontApp()
       captured.window = reinterpret_cast<quintptr>(window);
     }
 
-    CFRelease(focused);
+    CFRelease(app);
   }
 
   return captured;
@@ -170,13 +233,9 @@ void closeCapturedApp(const CapturedApp &app)
     // command+W only goes to the app in front: never close a tab somewhere else
     pid_t captured = 0;
     AXUIElementGetPid(window, &captured);
-    AXUIElementRef systemWide = AXUIElementCreateSystemWide();
-    CFTypeRef focused = nullptr;
-    AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, &focused);
-    CFRelease(systemWide);
     pid_t front = 0;
-    if (focused != nullptr) {
-      AXUIElementGetPid(static_cast<AXUIElementRef>(focused), &front);
+    if (AXUIElementRef focused = copyFrontApp(); focused != nullptr) {
+      AXUIElementGetPid(focused, &front);
       CFRelease(focused);
     }
     if (front != captured) {
