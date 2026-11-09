@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
 
+#include "deskflow/AppHandoff.h"
+#include "deskflow/AppHandoffEngine.h"
 #include "server/Server.h"
 
 #include "base/IEventQueue.h"
@@ -103,6 +105,9 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   m_events->addHandler(EventTypes::ServerSwitchToComputer, m_inputFilter, [this](const auto &e) {
     handleSwitchToComputerEvent(e);
   });
+  m_handoff = std::make_unique<deskflow::AppHandoffEngine>(m_events, this);
+  m_events->addHandler(EventTypes::AppHandoffCaptured, this, [this](const auto &e) { handleHandoffCaptured(e); });
+  m_events->addHandler(EventTypes::ServerHandoffApp, m_inputFilter, [this](const auto &) { startHandoffFromActive(); });
   m_events->addHandler(EventTypes::ServerSwitchInDirection, m_inputFilter, [this](const auto &e) {
     handleSwitchInDirectionEvent(e);
   });
@@ -173,6 +178,10 @@ Server::~Server()
   m_events->removeHandler(PrimaryComputerFakeInputEnd, m_inputFilter);
   m_events->removeHandler(Timer, this);
   stopSwitch();
+
+  m_handoff.reset();
+  m_events->removeHandler(EventTypes::AppHandoffCaptured, this);
+  m_events->removeHandler(EventTypes::ServerHandoffApp, m_inputFilter);
 
   try {
     // force immediate disconnection of secondary clients
@@ -262,6 +271,16 @@ bool Server::setConfig(const ServerConfig &config)
     }
   }
 
+  // ctrl+alt+super+H moves the app in front to the next computer (control+option+command on a
+  // mac). a client watches the same keys on its own keyboard.
+  {
+    IPlatformComputer::KeyInfo *key =
+        IPlatformComputer::KeyInfo::alloc('h', KeyModifierControl | KeyModifierAlt | KeyModifierSuper, 0, 0);
+    InputFilter::Rule rule(new InputFilter::KeystrokeCondition(m_events, key));
+    rule.adoptAction(new InputFilter::HandoffAppAction(m_events), true);
+    m_inputFilter->addFilterRule(rule);
+  }
+
   // tell primary computer about reconfiguration
   m_primaryClient->reconfigure(getActivePrimarySides());
 
@@ -269,6 +288,8 @@ bool Server::setConfig(const ServerConfig &config)
   for (ClientList::const_iterator index = m_clients.begin(); index != m_clients.end(); ++index) {
     BaseClientProxy *client = index->second;
     sendOptions(client);
+    // the layout may have changed, and a client takes over with the layout it was last sent
+    sendSwapInfo(client);
   }
 
   return true;
@@ -302,6 +323,7 @@ void Server::adoptClient(BaseClientProxy *client)
   ipcSendConnectionState(deskflow::core::ConnectionState::Connected);
   sendConnectedClientsIpc();
   notifyActiveComputer();
+  notifyMonitors();
   sendSwapInfo(client);
 
   // send configuration options to client
@@ -400,10 +422,11 @@ void Server::sendSwapInfo(BaseClientProxy *client) const
   const auto serverName = getName(m_primaryClient);
 
   // the client's edges that lead to the server
+  // (all links, not just each edge's middle: a link may cover only part of an edge)
   uint32_t edges = 0;
-  for (const auto dir : {Left, Right, Top, Bottom}) {
-    if (m_config->getNeighbor(clientName, dir, 0.5f, nullptr) == serverName) {
-      edges |= 1u << static_cast<int>(dir);
+  for (auto link = m_config->beginNeighbor(clientName), end = m_config->endNeighbor(clientName); link != end; ++link) {
+    if (m_config->getCanonicalName(link->second.getName()) == serverName) {
+      edges |= 1u << static_cast<int>(link->first.getSide());
     }
   }
 
@@ -444,6 +467,116 @@ void Server::handleRoleSwapRequest(BaseClientProxy *client, const std::string &h
   m_roleSwapClient = getName(client);
   m_roleSwapHosts = hosts;
   client->roleSwapAccepted();
+}
+
+void Server::notifyMonitors() const
+{
+  deskflow::MonitorMap monitors;
+  for (const auto &[name, client] : m_clients) {
+    monitors.insert(QString::fromStdString(name), client->getMonitors());
+  }
+  ipcSendMonitors(deskflow::formatMonitorMap(monitors));
+}
+
+std::string Server::nextHandoffTarget(const BaseClientProxy *source) const
+{
+  // the computers in name order, going round from the source
+  std::vector<std::string> names;
+  size_t sourceIndex = 0;
+  for (const auto &[name, client] : m_clients) {
+    if (client == source) {
+      sourceIndex = names.size();
+    }
+    if (client == source || client->supportsHandoff()) {
+      names.push_back(name);
+    }
+  }
+  for (size_t step = 1; step < names.size(); ++step) {
+    const auto &name = names[(sourceIndex + step) % names.size()];
+    if (m_clients.at(name) != source) {
+      return name;
+    }
+  }
+  return {};
+}
+
+void Server::startHandoffFromActive()
+{
+  if (m_active == nullptr || !m_active->supportsHandoff()) {
+    LOG_WARN("app handoff: the computer in use can't send apps");
+    return;
+  }
+
+  const auto target = nextHandoffTarget(m_active);
+  if (target.empty()) {
+    LOG_INFO("app handoff: no other computer to send to");
+    return;
+  }
+
+  if (m_active == m_primaryClient) {
+    m_handoff->capture(target);
+  } else {
+    m_active->requestHandoffCapture(target);
+  }
+}
+
+void Server::handleHandoffCaptured(const Event &event)
+{
+  const auto *capture = dynamic_cast<const deskflow::HandoffCapture *>(event.getDataObject());
+  if (capture == nullptr) {
+    return;
+  }
+
+  handleHandoffStart(
+      m_primaryClient, capture->m_target, capture->m_appId, capture->m_url, capture->m_fileName,
+      static_cast<uint32_t>(capture->m_data.size())
+  );
+  for (size_t offset = 0; offset < capture->m_data.size(); offset += deskflow::handoff::kChunkSize) {
+    handleHandoffData(m_primaryClient, capture->m_data.substr(offset, deskflow::handoff::kChunkSize));
+  }
+}
+
+void Server::handleHandoffStart(
+    BaseClientProxy *source, const std::string &target, const std::string &appId, const std::string &url,
+    const std::string &fileName, uint32_t size
+)
+{
+  m_handoffRoutes.erase(source);
+
+  const auto name = target.empty() ? nextHandoffTarget(source) : target;
+  const auto index = m_clients.find(name);
+  if (index == m_clients.end() || index->second == source || !index->second->supportsHandoff()) {
+    LOG_WARN("app handoff: can't send to \"%s\"", name.c_str());
+    return;
+  }
+
+  LOG_INFO("app handoff: from \"%s\" to \"%s\"", getName(source).c_str(), name.c_str());
+  m_handoffRoutes[source] = name;
+  if (index->second == m_primaryClient) {
+    m_handoff->begin(appId, url, fileName, size);
+  } else {
+    index->second->sendHandoffStart(appId, url, fileName, size);
+  }
+
+  // the cursor goes with the app
+  switchToComputerByName(name);
+}
+
+void Server::handleHandoffData(BaseClientProxy *source, const std::string &chunk)
+{
+  const auto route = m_handoffRoutes.find(source);
+  if (route == m_handoffRoutes.end()) {
+    return;
+  }
+  const auto index = m_clients.find(route->second);
+  if (index == m_clients.end()) {
+    return;
+  }
+  if (index->second == m_primaryClient) {
+    m_handoff->data(chunk);
+  } else {
+    index->second->sendHandoffData(chunk);
+  }
 }
 
 void Server::notifyActiveComputer() const
@@ -1282,6 +1415,7 @@ void Server::handleShapeChanged(BaseClientProxy *client)
   }
 
   LOG_DEBUG("computer \"%s\" shape changed", getName(client).c_str());
+  notifyMonitors();
 
   // update jump coordinate
   int32_t x;
@@ -1453,6 +1587,8 @@ void Server::handleClientDisconnected(BaseClientProxy *client)
   ipcSendConnectionState(m_clients.size() <= 1 ? Listening : Connected);
   sendConnectedClientsIpc();
   notifyActiveComputer();
+  notifyMonitors();
+  m_handoffRoutes.erase(client);
 
   delete client;
 }

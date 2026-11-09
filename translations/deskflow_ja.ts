@@ -757,6 +757,25 @@ Additionally, check you are able to %1 the server config file: %2</source>
     </message>
 </context>
 <context>
+    <name>MonitorLayoutView</name>
+    <message>
+        <source>In use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Not connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No computers yet. Add some on the Computers tab.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>NewComputerWidget</name>
     <message>
         <source>Unnamed</source>
@@ -1096,6 +1115,22 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Config file path</source>
         <translation>設定ファイルのパス</translation>
+    </message>
+    <message>
+        <source>Arrange computers by their monitors (replaces the Computers grid)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag a computer to where it really stands; it snaps to the others. The cursor can cross along the green lines.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Monitors</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The cursor can&apos;t reach %1. Move it so that its monitors touch another computer&apos;s.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1 Configurations (*.conf);;All files (*.*)</source>

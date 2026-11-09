@@ -22,6 +22,8 @@ public:
   void sendStop();
   void sendSwitchTo(const QString &computer);
   void requestActiveComputer();
+  void requestMonitors();
+  void sendReloadConfig();
 
 Q_SIGNALS:
   void commandReceived(const QString &command, const QString &args);

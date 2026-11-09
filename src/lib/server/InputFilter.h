@@ -191,6 +191,21 @@ public:
     IEventQueue *m_events;
   };
 
+  // HandoffAppAction
+  class HandoffAppAction : public Action
+  {
+  public:
+    explicit HandoffAppAction(IEventQueue *events);
+
+    // Action overrides
+    Action *clone() const override;
+    std::string format() const override;
+    void perform(const Event &) override;
+
+  private:
+    IEventQueue *m_events;
+  };
+
   // SwitchInDirectionAction
   class SwitchInDirectionAction : public Action
   {

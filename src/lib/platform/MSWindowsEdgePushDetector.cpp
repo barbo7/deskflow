@@ -40,6 +40,11 @@ public:
   {
   }
 
+  void setHandoffCallback(Callback onHandoff)
+  {
+    m_onHandoff = std::move(onHandoff);
+  }
+
   ~MSWindowsEdgePushDetector() override
   {
     if (m_window != nullptr) {
@@ -111,6 +116,10 @@ private:
       }
     }
 
+    if (!RegisterHotKey(window, kHandoffHotKey, MOD_CONTROL | MOD_ALT | MOD_WIN | MOD_NOREPEAT, 'H')) {
+      LOG_WARN("can't register the ctrl+alt+win+H hotkey, another app may be using it");
+    }
+
     started.set_value(window);
 
     MSG message;
@@ -131,7 +140,10 @@ private:
       break;
 
     case WM_HOTKEY:
-      if (self != nullptr) {
+      if (self != nullptr && wParam == static_cast<WPARAM>(kHandoffHotKey)) {
+        LOG_INFO("handoff hotkey pressed");
+        self->m_onHandoff();
+      } else if (self != nullptr) {
         self->handleHotKey();
       }
       return 0;
@@ -144,6 +156,7 @@ private:
 
     case WM_CLOSE: {
       KillTimer(window, kDesktopTimer);
+      UnregisterHotKey(window, kHandoffHotKey);
       for (const auto &arrow : kArrowKeys) {
         UnregisterHotKey(window, static_cast<int>(arrow.second));
       }
@@ -247,6 +260,8 @@ private:
     }
   }
 
+  // arrow hotkeys use their virtual key as their id, so the letter can't clash with them
+  static constexpr int kHandoffHotKey = 'H';
   static constexpr UINT_PTR kDesktopTimer = 1;
   // DirectionMask bit and virtual key of each arrow
   static constexpr std::pair<uint32_t, UINT> kArrowKeys[] = {
@@ -259,6 +274,7 @@ private:
   uint32_t m_edges;
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
+  Callback m_onHandoff;
   Callback m_onInputBlocked;
   bool m_inputBlocked = false;
   EdgePushAccumulator::Clock::time_point m_lastHotKey;
@@ -268,10 +284,12 @@ private:
 
 } // namespace
 
-std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush, Callback onInputBlocked)
+std::unique_ptr<EdgePushDetector>
+EdgePushDetector::create(uint32_t edges, Callback onPush, Callback onInputBlocked, Callback onHandoff)
 {
   // runs even with no edges to watch, to notice screens deskflow can't control
   auto detector = std::make_unique<MSWindowsEdgePushDetector>(edges, std::move(onPush), std::move(onInputBlocked));
+  detector->setHandoffCallback(std::move(onHandoff));
   if (!detector->start()) {
     return nullptr;
   }

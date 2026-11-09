@@ -757,6 +757,25 @@ Además, verifique que puede %1 el archivo de configuración del servidor: %2</t
     </message>
 </context>
 <context>
+    <name>MonitorLayoutView</name>
+    <message>
+        <source>In use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Not connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No computers yet. Add some on the Computers tab.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>NewComputerWidget</name>
     <message>
         <source>Unnamed</source>
@@ -1094,6 +1113,22 @@ Al habilitar esta opción, se deshabilitará la interfaz gráfica de usuario (GU
     <message>
         <source>Config file path</source>
         <translation type="unfinished">Ruta del archivo de configuración</translation>
+    </message>
+    <message>
+        <source>Arrange computers by their monitors (replaces the Computers grid)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag a computer to where it really stands; it snaps to the others. The cursor can cross along the green lines.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Monitors</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The cursor can&apos;t reach %1. Move it so that its monitors touch another computer&apos;s.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1 Configurations (*.conf);;All files (*.*)</source>

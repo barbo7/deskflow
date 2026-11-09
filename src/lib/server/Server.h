@@ -22,6 +22,10 @@
 #include <set>
 #include <vector>
 
+namespace deskflow {
+class AppHandoffEngine;
+}
+
 class BaseClientProxy;
 class EventQueueTimer;
 class PrimaryClient;
@@ -198,6 +202,18 @@ public:
   */
   void getClients(std::vector<std::string> &list) const;
   void sendConnectedClientsIpc() const;
+
+  //! Tell the gui about the monitors of every connected computer.
+  void notifyMonitors() const;
+
+  //! An app is being moved; \p target is empty if \p source left the choice to the server.
+  void handleHandoffStart(
+      BaseClientProxy *source, const std::string &target, const std::string &appId, const std::string &url,
+      const std::string &fileName, uint32_t size
+  );
+
+  //! The next piece of the file of the app \p source is moving.
+  void handleHandoffData(BaseClientProxy *source, const std::string &chunk);
   size_t getMaximumClipboardSizeBytes() const;
 
   //! Move the cursor to the computer called \p computer (from the gui or a client request).
@@ -320,6 +336,9 @@ private:
 
   // event handlers
   void handleShapeChanged(BaseClientProxy *client);
+  void startHandoffFromActive();
+  void handleHandoffCaptured(const Event &event);
+  std::string nextHandoffTarget(const BaseClientProxy *source) const;
   void handleClipboardGrabbed(const Event &event, BaseClientProxy *client);
   void handleClipboardChanged(const Event &event, BaseClientProxy *client);
   void handleKeyDownEvent(const Event &event);
@@ -399,6 +418,10 @@ private:
 
   // input filter (from m_config);
   InputFilter *m_inputFilter = nullptr;
+
+  std::unique_ptr<deskflow::AppHandoffEngine> m_handoff;
+  //! Which computer the app each source is currently moving goes to.
+  std::map<const BaseClientProxy *, std::string> m_handoffRoutes;
 
   // state saved when screen saver activates
   BaseClientProxy *m_activeSaver = nullptr;

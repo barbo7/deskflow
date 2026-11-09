@@ -36,3 +36,12 @@ void ipcSendActiveComputer(const QString &active, const QString &computers)
       Qt::QueuedConnection
   );
 }
+
+void ipcSendMonitors(const QString &monitors)
+{
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server, [monitors] { deskflow::core::ipc::CoreIpcServer::instance().setMonitors(monitors); },
+      Qt::QueuedConnection
+  );
+}

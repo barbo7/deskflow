@@ -49,6 +49,15 @@ void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &co
     writeToClientSocket(clientSocket, activeComputerMessage());
     return;
   }
+  if (command == QStringLiteral("getMonitors")) {
+    writeToClientSocket(clientSocket, QStringLiteral("monitors=%1").arg(m_monitors));
+    return;
+  }
+  if (command == QStringLiteral("reloadConfig")) {
+    LOG_DEBUG("core ipc server got reload config request");
+    Q_EMIT reloadConfigRequested();
+    return;
+  }
   LOG_WARN("core ipc server got unknown command: %s", command.toUtf8().constData());
 }
 
@@ -59,6 +68,12 @@ void CoreIpcServer::setActiveComputer(const QString &active, const QString &comp
   const auto message = activeComputerMessage();
   const auto equals = message.indexOf('=');
   broadcastCommand(message.left(equals), message.mid(equals + 1));
+}
+
+void CoreIpcServer::setMonitors(const QString &monitors)
+{
+  m_monitors = monitors;
+  broadcastCommand(QStringLiteral("monitors"), monitors);
 }
 
 QString CoreIpcServer::activeComputerMessage() const

@@ -15,6 +15,8 @@
 #include <QSystemTrayIcon>
 #include <QUrl>
 
+class ServerConfigDialog;
+
 #include "VersionChecker.h"
 #include "config/ServerConfig.h"
 #include "gui/core/CoreProcess.h"
@@ -120,6 +122,9 @@ private:
   void applyConfig();
   void setTrayIcon();
   void handleActiveComputerChanged(const QString &active, const QStringList &computers);
+  void handleMonitorsChanged(const QString &monitors);
+  void connectMonitorState(ServerConfigDialog &dialog);
+  void applyServerConfigDialog(const ServerConfigDialog &dialog);
   void updateSwitchMenu();
   void setupActiveComputerBar();
   void handleRoleSwap(const QString &role, const QString &data);
@@ -127,7 +132,7 @@ private:
   void revertRoleSwap();
   static void shareTrustAcrossRoles();
   static QString writeSwapConfig(const QString &config);
-  inline static const auto kSwapConfigName = QStringLiteral("deskflow-server-swap.conf");
+  inline static const auto kSwapConfigName = ServerConfig::kSwapConfigName;
   void startCoreWhenStopped(int attempts = 50);
   void updateActiveComputerBar();
   bool setActiveComputerTrayIcon();
@@ -197,6 +202,7 @@ private:
   QMenu *m_trayMenu = nullptr;
   QString m_activeComputer;
   QStringList m_computers; // "name|platform"
+  deskflow::MonitorMap m_computerMonitors;
   QList<QAction *> m_switchActions;
   QTimer *m_roleSwapTimer = nullptr;
   QString m_roleSwapRole; // the role a swap in progress is changing to, empty if none

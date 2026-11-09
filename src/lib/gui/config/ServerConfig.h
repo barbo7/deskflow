@@ -10,6 +10,7 @@
 
 #include "common/Constants.h"
 #include "common/Hotkey.h"
+#include "common/MonitorLayout.h"
 #include "gui/config/ComputerConfig.h"
 #include "gui/config/ComputerList.h"
 
@@ -57,6 +58,33 @@ public:
   bool useExternalConfig() const;
   void addClient(const QString &clientName);
 
+  //! Layout file a computer borrows from the old server when it takes over.
+  inline static const auto kSwapConfigName = QStringLiteral("deskflow-server-swap.conf");
+
+  //! Whether links come from where the monitors are placed, rather than the computer grid.
+  [[nodiscard]] bool useMonitorLayout() const
+  {
+    return m_useMonitorLayout;
+  }
+  void setUseMonitorLayout(bool use)
+  {
+    m_useMonitorLayout = use;
+  }
+  [[nodiscard]] const deskflow::PlacementList &placements() const
+  {
+    return m_placements;
+  }
+  void setPlacements(const deskflow::PlacementList &placements)
+  {
+    m_placements = placements;
+  }
+
+  /**
+   * Take in the computers' current monitors.
+   * \return true if that changes the links this configuration produces.
+   */
+  bool updateMonitors(const deskflow::MonitorMap &monitors);
+
 private:
   void recall();
   void setupComputers();
@@ -87,6 +115,8 @@ private:
   HotkeyList m_Hotkeys;
 
   ComputerList m_computers;
+  bool m_useMonitorLayout = false;
+  deskflow::PlacementList m_placements;
   int m_columns;
   int m_rows;
 };

@@ -425,6 +425,22 @@ bool MSWindowsComputer::getClipboard(ClipboardID, IClipboard *dst) const
   return true;
 }
 
+deskflow::MonitorList MSWindowsComputer::getMonitors() const
+{
+  deskflow::MonitorList monitors;
+  EnumDisplayMonitors(
+      nullptr, nullptr,
+      [](HMONITOR, HDC, LPRECT area, LPARAM data) -> BOOL {
+        reinterpret_cast<deskflow::MonitorList *>(data)->append(
+            QRect(area->left, area->top, area->right - area->left, area->bottom - area->top)
+        );
+        return TRUE;
+      },
+      reinterpret_cast<LPARAM>(&monitors)
+  );
+  return monitors.isEmpty() ? IPlatformComputer::getMonitors() : monitors;
+}
+
 void MSWindowsComputer::getShape(int32_t &x, int32_t &y, int32_t &w, int32_t &h) const
 {
   assert(m_class != 0);

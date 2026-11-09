@@ -283,6 +283,10 @@ void MainWindow::connectSlots()
 
   connect(&m_coreProcess, &CoreProcess::connectedClientsChanged, this, &MainWindow::serverClientsChanged);
   connect(&m_coreProcess, &CoreProcess::activeComputerChanged, this, &MainWindow::handleActiveComputerChanged);
+  connect(&m_coreProcess, &CoreProcess::monitorsChanged, this, &MainWindow::handleMonitorsChanged);
+  connect(&m_coreProcess, &CoreProcess::handoffStatus, this, [this](const QString &message) {
+    m_trayIcon->showMessage(kAppName, message, QSystemTrayIcon::Information, 4000);
+  });
   connect(&m_coreProcess, &CoreProcess::roleSwapRequested, this, &MainWindow::handleRoleSwap);
   connect(&m_coreProcess, &CoreProcess::unrecognisedClient, this, &MainWindow::handleUnrecognisedClient);
   connect(&m_coreProcess, &CoreProcess::connectionRefused, this, &MainWindow::handleConnectionRefused);
@@ -621,6 +625,7 @@ void MainWindow::serverConnectionConfigureClient(const QString &clientName)
 {
   m_serverConfigDialogVisible = true;
   ServerConfigDialog dialog(this, m_serverConfig);
+  connectMonitorState(dialog);
   if (dialog.addClient(clientName) && dialog.exec() == QDialog::Accepted) {
     m_coreProcess.restart();
   }
@@ -803,7 +808,29 @@ void MainWindow::handleRoleSwap(const QString &role, const QString &data)
     qInfo("role swap: becoming the server");
     // our own layout will do only if it already has every connected computer; a computer that
     // was only ever a client doesn't, so it uses the layout the old server sent
-    bool ownLayoutFits = !m_computers.isEmpty();
+    // (and only if it's the layout in use: the old server's may have been rearranged since)
+    const auto linkLines = [](const QString &config) {
+      QSet<QString> lines;
+      bool inLinks = false;
+      const auto all = config.split(QLatin1Char('\n'));
+      for (const auto &raw : all) {
+        const auto line = raw.trimmed();
+        if (line == QStringLiteral("section: links")) {
+          inLinks = true;
+        } else if (inLinks && line == QStringLiteral("end")) {
+          break;
+        } else if (inLinks && !line.isEmpty()) {
+          lines.insert(line);
+        }
+      }
+      return lines;
+    };
+    QString ownConfig;
+    QTextStream ownStream(&ownConfig);
+    ownStream << m_serverConfig;
+    ownStream.flush();
+
+    bool ownLayoutFits = !m_computers.isEmpty() && linkLines(ownConfig) == linkLines(data);
     for (const auto &entry : std::as_const(m_computers)) {
       const auto name = entry.section('|', 0, 0);
       const auto &computers = std::as_const(m_serverConfig).computers();
@@ -1475,8 +1502,44 @@ void MainWindow::showConfigureServer(const QString &message)
 {
   ServerConfigDialog dialog(this, serverConfig());
   dialog.message(message);
+  connectMonitorState(dialog);
   if ((dialog.exec() == QDialog::Accepted) && m_coreProcess.isStarted()) {
-    m_coreProcess.restart();
+    applyServerConfigDialog(dialog);
+  }
+}
+
+void MainWindow::connectMonitorState(ServerConfigDialog &dialog)
+{
+  const auto update = [this, &dialog] {
+    QSet<QString> connected;
+    for (const auto &entry : std::as_const(m_computers)) {
+      connected.insert(entry.section('|', 0, 0));
+    }
+    dialog.setMonitorState(m_computerMonitors, connected, m_activeComputer);
+  };
+  update();
+  connect(&m_coreProcess, &CoreProcess::monitorsChanged, &dialog, update);
+  connect(&m_coreProcess, &CoreProcess::activeComputerChanged, &dialog, update);
+}
+
+void MainWindow::applyServerConfigDialog(const ServerConfigDialog &dialog)
+{
+  // moving computers around needn't interrupt anyone
+  if (dialog.appliesLive() && m_coreProcess.reloadServerConfig()) {
+    qInfo("applied the new layout without restarting");
+    return;
+  }
+  m_coreProcess.restart();
+}
+
+void MainWindow::handleMonitorsChanged(const QString &monitors)
+{
+  m_computerMonitors = deskflow::parseMonitorMap(monitors);
+
+  // a monitor plugged in or removed changes where the cursor can cross
+  if (m_serverConfig.updateMonitors(m_computerMonitors) && !m_serverConfig.useExternalConfig() &&
+      m_coreProcess.mode() == CoreMode::Server) {
+    m_coreProcess.reloadServerConfig();
   }
 }
 

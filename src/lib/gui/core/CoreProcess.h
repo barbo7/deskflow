@@ -43,6 +43,12 @@ public:
   void start(std::optional<ProcessMode> processMode = std::nullopt);
   void stop(std::optional<ProcessMode> processMode = std::nullopt);
   void restart();
+
+  /**
+   * Have the running server pick up the layout, without dropping its connections.
+   * \return false if it can't, in which case nothing changed: restart() instead.
+   */
+  bool reloadServerConfig();
   void cleanup();
   void applyLogLevel();
   void clearSettings();
@@ -91,6 +97,13 @@ Q_SIGNALS:
   void secureSocket(bool enabled);
   void daemonIpcClientConnectionFailed();
   void connectedClientsChanged(const QStringList &clients);
+  /**
+   * The monitors of the connected computers changed.
+   * \param monitors As written by deskflow::formatMonitorMap().
+   */
+  void monitorsChanged(const QString &monitors);
+  //! Something the user should hear about moving an app between computers.
+  void handoffStatus(const QString &message);
   void securityLevelChanged(QString securityLevel);
   void unrecognisedClient(const QString &clientName);
   void connectionRefused(deskflow::core::ConnectionRefusal reason);

@@ -337,6 +337,26 @@ void InputFilter::SwitchInDirectionAction::perform(const Event &event)
   );
 }
 
+InputFilter::HandoffAppAction::HandoffAppAction(IEventQueue *events) : m_events(events)
+{
+  // do nothing
+}
+
+InputFilter::Action *InputFilter::HandoffAppAction::clone() const
+{
+  return new HandoffAppAction(*this);
+}
+
+std::string InputFilter::HandoffAppAction::format() const
+{
+  return "handoffApp";
+}
+
+void InputFilter::HandoffAppAction::perform(const Event &event)
+{
+  m_events->addEvent(Event(EventTypes::ServerHandoffApp, event.getTarget(), nullptr, Event::EventFlags::DeliverImmediately));
+}
+
 InputFilter::SwitchToNextComputerAction::SwitchToNextComputerAction(IEventQueue *events) : m_events(events)
 {
   // do nothing

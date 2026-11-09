@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <memory>
+#include "common/MonitorLayout.h"
 #include "deskflow/IClient.h"
 
 #include "base/Event.h"
@@ -18,6 +20,10 @@
 
 #include <climits>
 #include <string>
+
+namespace deskflow {
+class AppHandoffEngine;
+}
 
 class Event;
 class EventQueueTimer;
@@ -205,6 +211,18 @@ public:
   //! Ask the server to let this computer take over as server.
   void requestRoleSwap(const std::string &hosts);
 
+  //! This computer's physical monitors.
+  [[nodiscard]] deskflow::MonitorList getMonitors() const;
+
+  //! Send the app in front to \p target; empty lets the server pick.
+  void captureForHandoff(const std::string &target);
+
+  //! An app is arriving; \p size bytes of its file follow through handoffData().
+  void handoffStart(const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size);
+
+  //! The next piece of the arriving file.
+  void handoffData(const std::string &chunk);
+
   //! The DirectionMask of this computer's edges that lead to the server.
   uint32_t swapEdges() const
   {
@@ -233,6 +251,7 @@ private:
   void handleDisconnected();
   void handleDisconnectRequested(const Event &event);
   void handleShapeChanged();
+  void handleHandoffCaptured(const Event &event);
   void handleClipboardGrabbed(const Event &event);
   void handleHello();
   void handleSuspend();
@@ -251,6 +270,7 @@ private:
   bool m_ready = false;
   bool m_active = false;
   uint32_t m_swapEdges = 0;
+  std::unique_ptr<deskflow::AppHandoffEngine> m_handoff;
   std::string m_swapConfig;
   bool m_suspended = false;
   bool m_connectOnResume = false;

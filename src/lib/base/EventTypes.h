@@ -141,6 +141,9 @@ enum class EventTypes : uint32_t
   */
   ServerSwitchInDirection,
 
+  /// The hotkey for moving the front app to another computer was pressed. No data.
+  ServerHandoffApp,
+
   /** This event is sent to inform the server to turn keyboard broadcasting on or off.
       The event data is a pointer to KeyboardBroadcastInfo.
   */
@@ -166,6 +169,13 @@ enum class EventTypes : uint32_t
   /// Sent to the app's system target when the user's own mouse was pushed against an edge
   /// that leads to the server, asking for a role swap. No data.
   AppRoleSwapRequest,
+
+  /// Sent to the app's system target when the handoff hotkey was pressed on a client's own
+  /// keyboard. No data.
+  AppHandoffRequest,
+
+  /// The app in front has been looked at and is ready to send. The data is a HandoffCapture.
+  AppHandoffCaptured,
 
   /// Sent to a client's event target when the server sent role swap information. No data.
   ClientSwapInfoReceived,

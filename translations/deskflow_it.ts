@@ -757,6 +757,25 @@ Inoltre, verifica di poter %1 il file di configurazione del server: %2</translat
     </message>
 </context>
 <context>
+    <name>MonitorLayoutView</name>
+    <message>
+        <source>In use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Not connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No computers yet. Add some on the Computers tab.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>NewComputerWidget</name>
     <message>
         <source>Unnamed</source>
@@ -1094,6 +1113,22 @@ Enabling this setting will disable the server config GUI.</source>
         <translation>Utilizza un file di configurazione del server per creare layout di computer complessi che non sono possibili con il semplice editor di layout del computer basato su griglia.
 
 L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia grafica di configurazione del server.</translation>
+    </message>
+    <message>
+        <source>Arrange computers by their monitors (replaces the Computers grid)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag a computer to where it really stands; it snaps to the others. The cursor can cross along the green lines.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Monitors</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The cursor can&apos;t reach %1. Move it so that its monitors touch another computer&apos;s.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1 Configurations (*.conf);;All files (*.*)</source>

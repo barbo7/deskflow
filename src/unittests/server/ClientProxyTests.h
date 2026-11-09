@@ -24,6 +24,13 @@ private Q_SLOTS:
   void keyUp();
   void activeComputerChanged_data();
   void activeComputerChanged();
+  void sendHandoffStart_data();
+  void sendHandoffStart();
+  void sendHandoffData_data();
+  void sendHandoffData();
+  void requestHandoffCapture_data();
+  void requestHandoffCapture();
+  void supportsHandoff_from1_10();
   void sendSwapInfo_data();
   void sendSwapInfo();
   void roleSwapAccepted_data();

@@ -241,7 +241,67 @@ Kaynaktan derlenen uygulama Homebrew'deki Qt'ye bağlıdır; başka Mac'lere kop
 
 ---
 
-## 7. Commit geçmişi
+## 7. Monitör düzeni ve uygulama taşıma (protokol 1.10)
+
+### Monitör düzeni
+
+Configure Server > **Monitors** sekmesi her bilgisayarın gerçek monitörlerini ölçekli gösterir; kimin
+bağlı olduğu ve imlecin nerede olduğu canlı güncellenir. "Arrange computers by their monitors"
+kutusu işaretlenince bilgisayarlar sürüklenebilir, yaklaştıkları kenara yapışırlar.
+
+- İmleç yalnızca **yeşil çizgiler** boyunca geçer. Çizgiler, iki bilgisayarın gerçekten monitörü olan
+  kenarlarının değdiği yerlerdir.
+- Sadece yerleşim değiştiyse **bağlantı kopmadan** uygulanır. Bilgisayar eklemek, kısayol ya da genel
+  ayar değiştirmek eskisi gibi yeniden başlatır.
+- Monitör takılıp çıkarılınca çizgiler kendiliğinden yenilenir.
+- Bir bilgisayarın **kendi içindeki** monitör sırası işletim sisteminin ayarıdır; Deskflow bunu
+  değiştirmez. Taşınan birim bilgisayarın tamamıdır.
+
+### Uygulama taşıma
+
+Öndeki uygulamayı bir sonraki bilgisayara gönderir, imleç de onunla gider.
+
+| Kısayol | Nerede |
+|---|---|
+| `Ctrl+Alt+Win+H` / `Control+Option+Command+H` | Patronun klavyesinde: imlecin olduğu bilgisayardaki uygulama taşınır |
+| Aynı tuşlar | Yardımcının kendi klavyesinde: o bilgisayardaki uygulama taşınır |
+
+Çalışan bir program Mac ile Windows arasında taşınamaz. Taşınan şey **sayfa ya da belgedir**; karşıda
+aynı uygulama açılır.
+
+| Ne | Ne olur |
+|---|---|
+| Chrome, Edge, Brave, Safari | Sayfa karşıda açılır, sekme kaynakta kapanır (`Ctrl+Shift+T` ile geri gelir) |
+| Word, Excel, PowerPoint, Acrobat, VS Code, Cursor, Sublime... | Belgenin **diske kayıtlı hali** kopyalanır (`İndirilenler/Deskflow Handoff`), karşıda açılır. Kaynaktaki pencere açık kalır |
+| Spotify, Slack, Discord, Teams, Zoom, Notion, Figma... | Uygulama karşıda açılır; içeriği kendi hesabından gelir |
+| Listede olmayan uygulama | Belgesi varsa ve düz bir belgeyse varsayılan uygulamayla açılır, yoksa taşınmaz |
+
+Sınırlar:
+
+- Kaydedilmemiş değişiklikler ve açık sekme durumu taşınmaz.
+- En fazla 32 MB'lık dosya gider; daha büyüğünde yalnızca uygulama açılır.
+- Firefox'un Mac'te betik arayüzü yok: Mac'ten gönderilirken sayfa gitmez, yalnızca Firefox açılır.
+- Windows'ta açık belge pencere başlığından ve "Son kullanılanlar" klasöründen bulunur; dosya orada
+  yoksa yalnızca uygulama açılır.
+- Mac'te ilk kullanımda "Deskflow, Chrome'u denetlemek istiyor" izni sorulur.
+- Linux yalnızca alabilir.
+
+Güvenlik: karşı taraf yalnızca listedeki bir uygulamanın **kimliğini** gönderebilir, çalıştırılacak bir
+program gönderemez. Adres olarak yalnızca `http(s)`, varsayılan uygulamayla açmak için yalnızca düz belge
+türleri kabul edilir; dosya adları temizlenir.
+
+| Mesaj | Yön | İçerik |
+|---|---|---|
+| `DMON` | Yardımcı → patron | Monitörler (`x,y,g,y;...`) |
+| `DHRQ` | Patron → yardımcı | "Öndeki uygulamayı şuna gönder" |
+| `DHST` | İki yönlü | Hedef, uygulama, adres, dosya adı, boyut |
+| `DHDT` | İki yönlü | Dosyanın bir parçası (512 KB) |
+
+Eski sürümler 1.9'a düşer ve bu özellikleri görmez; taşıma için iki bilgisayar da bu sürümde olmalı.
+
+---
+
+## 8. Commit geçmişi
 
 | Commit | Ne |
 |---|---|

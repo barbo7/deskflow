@@ -11,6 +11,7 @@
 #include "client/Client.h"
 #include "client/ServerProxy.h"
 #include "client/ServerProxy1_9.h"
+#include "client/ServerProxy1_10.h"
 #include "deskflow/ActiveComputer.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/ProtocolTypes.h"
@@ -405,6 +406,39 @@ void ServerProxyTests::requestRoleSwap_1_9_sendsSwapRequest()
 
   proxy.requestRoleSwap("192.168.1.2,10.0.0.5");
   QCOMPARE(stream.takeWritten(), "DSRQ" + protocolString("192.168.1.2,10.0.0.5"));
+}
+
+void ServerProxyTests::sendMonitors_1_10_sendsMonitors()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  ServerProxy1_10 proxy(undereferenceableClient(), &stream, &events);
+  stream.takeWritten();
+
+  proxy.sendMonitors({QRect(0, 0, 1920, 1080), QRect(-100, -50, 800, 600)});
+  QCOMPARE(stream.takeWritten(), "DMON" + protocolString("0,0,1920,1080;-100,-50,800,600"));
+}
+
+void ServerProxyTests::sendMonitors_before1_10_sendsNothing()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  ServerProxy1_9 proxy(undereferenceableClient(), &stream, &events);
+  stream.takeWritten();
+
+  proxy.sendMonitors({QRect(0, 0, 1920, 1080)});
+  QCOMPARE(stream.takeWritten(), std::string());
+}
+
+void ServerProxyTests::sendHandoffData_1_10_sendsChunk()
+{
+  RecordingEventQueue events;
+  FakeStream stream;
+  ServerProxy1_10 proxy(undereferenceableClient(), &stream, &events);
+  stream.takeWritten();
+
+  proxy.sendHandoffData("abc");
+  QCOMPARE(stream.takeWritten(), "DHDT" + protocolString("abc"));
 }
 
 QTEST_MAIN(ServerProxyTests)

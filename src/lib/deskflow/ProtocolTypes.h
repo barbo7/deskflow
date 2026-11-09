@@ -45,7 +45,7 @@ static const int16_t kProtocolMajorVersion = 1;
  * @note When incrementing the minor version, the Deskflow application version should also increment
  * @since Protocol version 1.0
  */
-static const int16_t kProtocolMinorVersion = 9;
+static const int16_t kProtocolMinorVersion = 10;
 
 /**
  * @brief Default TCP port for Deskflow connections
@@ -1256,6 +1256,60 @@ extern const char *const kMsgDSwapRequest;
  * @since Protocol version 1.9
  */
 extern const char *const kMsgDSwapGo;
+
+/**
+ * @brief The client's monitors
+ *
+ * **Message Code**: `"DMON"`
+ * **Direction**: Secondary → Primary
+ * **Format**: `"DMON%s"`
+ * **Parameters**:
+ * - `$1`: The monitors, as "x,y,w,h" joined by ";" (string)
+ *
+ * @since Protocol version 1.10
+ */
+extern const char *const kMsgDMonitors;
+
+/**
+ * @brief Send your front app to another computer
+ *
+ * **Message Code**: `"DHRQ"`
+ * **Direction**: Primary → Secondary
+ * **Format**: `"DHRQ%s"`
+ * **Parameters**:
+ * - `$1`: Name of the computer to send it to (string)
+ *
+ * @since Protocol version 1.10
+ */
+extern const char *const kMsgDHandoffRequest;
+
+/**
+ * @brief An app is being moved
+ *
+ * **Message Code**: `"DHST"`
+ * **Direction**: Both
+ * **Format**: `"DHST%s%s%s%s%4i"`
+ * **Parameters**:
+ * - `$1`: Name of the computer it's for; empty lets the server pick (string)
+ * - `$2`: App, an id from the list of known apps; may be empty (string)
+ * - `$3`: Web address to open; may be empty (string)
+ * - `$4`: Name of the file that follows in DHDT messages; may be empty (string)
+ * - `$5`: Size of that file in bytes (4-byte integer)
+ *
+ * @since Protocol version 1.10
+ */
+extern const char *const kMsgDHandoffStart;
+
+/**
+ * @brief A piece of the file announced by DHST
+ *
+ * **Message Code**: `"DHDT"`
+ * **Direction**: Both
+ * **Format**: `"DHDT%s"`
+ *
+ * @since Protocol version 1.10
+ */
+extern const char *const kMsgDHandoffData;
 
 /** @} */ // end of protocol_system group
 

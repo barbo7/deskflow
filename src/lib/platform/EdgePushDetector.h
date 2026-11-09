@@ -30,9 +30,11 @@ public:
    * \param onPush Called (from a worker thread) when the mouse is pushed past one of them.
    * \param onInputBlocked Called (from a worker thread) when this computer switches to a screen
    *        deskflow can't control, such as an elevation prompt; may not be supported everywhere.
+   * \param onHandoff Called (from a worker thread) when ctrl+alt+super+H is pressed on this
+   *        computer's own keyboard.
    * \return nullptr if this platform can't watch the mouse.
    */
-  static std::unique_ptr<EdgePushDetector> create(uint32_t edges, Callback onPush, Callback onInputBlocked);
+  static std::unique_ptr<EdgePushDetector> create(uint32_t edges, Callback onPush, Callback onInputBlocked, Callback onHandoff);
 };
 
 } // namespace deskflow

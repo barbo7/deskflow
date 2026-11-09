@@ -19,3 +19,9 @@ void ipcSendConnectionState(deskflow::core::ConnectionState state);
  * \param computers Connected computers as "name|platform" pairs joined by ",".
  */
 void ipcSendActiveComputer(const QString &active, const QString &computers);
+
+/**
+ * Tell the gui about the monitors of every connected computer.
+ * \param monitors As written by deskflow::formatMonitorMap().
+ */
+void ipcSendMonitors(const QString &monitors);

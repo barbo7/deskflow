@@ -181,10 +181,13 @@ endif()
 list(APPEND PLATFORM_SOURCES EdgePushDetector.h)
 if(WIN32)
   list(APPEND PLATFORM_SOURCES MSWindowsEdgePushDetector.cpp)
+  list(APPEND PLATFORM_SOURCES MSWindowsAppHandoff.cpp)
 elseif(APPLE)
   list(APPEND PLATFORM_SOURCES OSXEdgePushDetector.mm)
+  list(APPEND PLATFORM_SOURCES OSXAppHandoff.mm)
 else()
   list(APPEND PLATFORM_SOURCES EdgePushDetectorNull.cpp)
+  list(APPEND PLATFORM_SOURCES AppHandoffNull.cpp)
 endif()
 
 # wayland.h is included to check for wayland support

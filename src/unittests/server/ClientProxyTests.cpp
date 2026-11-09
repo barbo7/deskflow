@@ -16,6 +16,7 @@
 #include "server/ClientProxy1_7.h"
 #include "server/ClientProxy1_8.h"
 #include "server/ClientProxy1_9.h"
+#include "server/ClientProxy1_10.h"
 
 #include <memory>
 #include <string>
@@ -124,6 +125,9 @@ std::unique_ptr<ClientProxy> makeProxy(int minor, deskflow::IStream *stream, IEv
     break;
   case 9:
     proxy = std::make_unique<ClientProxy1_9>("client", stream, server, events);
+    break;
+  case 10:
+    proxy = std::make_unique<ClientProxy1_10>("client", stream, server, events);
     break;
   default:
     break;
@@ -269,6 +273,71 @@ void ClientProxyTests::sendSwapInfo()
   ProxyUnderTest test(minor);
   test.proxy->sendSwapInfo(static_cast<uint32_t>(DirectionMask::RightMask), "conf");
   QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::sendHandoffStart_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.9") << 9 << QByteArray();
+  QTest::newRow("1.10") << 10
+                        << "DHST" + QByteArray::fromHex("00000000 00000004") + "word" +
+                               QByteArray::fromHex("00000000 00000001") + "a" + QByteArray::fromHex("00000005");
+}
+
+void ClientProxyTests::sendHandoffStart()
+{
+  QFETCH(int, minor);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->sendHandoffStart("word", "", "a", 5);
+  QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::sendHandoffData_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.9") << 9 << QByteArray();
+  QTest::newRow("1.10") << 10 << "DHDT" + QByteArray::fromHex("00000003") + "abc";
+}
+
+void ClientProxyTests::sendHandoffData()
+{
+  QFETCH(int, minor);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->sendHandoffData("abc");
+  QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::requestHandoffCapture_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.9") << 9 << QByteArray();
+  QTest::newRow("1.10") << 10 << "DHRQ" + QByteArray::fromHex("00000002") + "pc";
+}
+
+void ClientProxyTests::requestHandoffCapture()
+{
+  QFETCH(int, minor);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->requestHandoffCapture("pc");
+  QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::supportsHandoff_from1_10()
+{
+  QVERIFY(!ProxyUnderTest(9).proxy->supportsHandoff());
+  QVERIFY(ProxyUnderTest(10).proxy->supportsHandoff());
 }
 
 void ClientProxyTests::roleSwapAccepted_data()

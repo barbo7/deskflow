@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "deskflow/Computer.h"
 #include "deskflow/ActiveComputer.h"
 #include "server/BaseClientProxy.h"
 
@@ -143,6 +144,16 @@ public:
   std::string getPlatform() const override
   {
     return deskflow::localPlatformName();
+  }
+
+  deskflow::MonitorList getMonitors() const override
+  {
+    return m_computer->getMonitors();
+  }
+
+  bool supportsHandoff() const override
+  {
+    return true;
   }
 
 private:

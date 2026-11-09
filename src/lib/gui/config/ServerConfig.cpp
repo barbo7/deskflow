@@ -51,8 +51,14 @@ bool ServerConfig::save(const QString &fileName) const
 
 bool ServerConfig::operator==(const ServerConfig &sc) const
 {
+  // only where computers were put counts as a change: not what monitors they turned out to have
+  const auto samePlaces = std::equal(
+      m_placements.begin(), m_placements.end(), sc.m_placements.begin(), sc.m_placements.end(),
+      [](const auto &a, const auto &b) { return a.name == b.name && a.pos == b.pos; }
+  );
   return m_computers == sc.m_computers && //
-         m_Hotkeys == sc.m_Hotkeys;       //
+         m_Hotkeys == sc.m_Hotkeys &&     //
+         m_useMonitorLayout == sc.m_useMonitorLayout && samePlaces;
 }
 
 void ServerConfig::save(QFile &file) const
@@ -98,6 +104,18 @@ void ServerConfig::commit()
   }
   settings().endArray();
 
+  settings().setValue("useMonitorLayout", m_useMonitorLayout);
+  settings().beginWriteArray("placements");
+  for (int i = 0; i < m_placements.size(); i++) {
+    settings().setArrayIndex(i);
+    const auto &placement = m_placements.at(i);
+    settings().setValue("name", placement.name);
+    settings().setValue("x", placement.pos.x());
+    settings().setValue("y", placement.pos.y());
+    settings().setValue("monitors", deskflow::formatMonitors(placement.monitors));
+  }
+  settings().endArray();
+
   settings().endGroup();
 }
 
@@ -134,6 +152,21 @@ void ServerConfig::recall()
   }
   settings().endArray();
 
+  m_useMonitorLayout = settings().value("useMonitorLayout", false).toBool();
+  m_placements.clear();
+  const int numPlacements = settings().beginReadArray("placements");
+  for (int i = 0; i < numPlacements; i++) {
+    settings().setArrayIndex(i);
+    deskflow::ComputerPlacement placement;
+    placement.name = settings().value("name").toString();
+    placement.pos = {settings().value("x").toInt(), settings().value("y").toInt()};
+    placement.monitors = deskflow::parseMonitors(settings().value("monitors").toString());
+    if (!placement.name.isEmpty() && !placement.monitors.isEmpty()) {
+      m_placements.append(placement);
+    }
+  }
+  settings().endArray();
+
   settings().endGroup();
 }
 
@@ -159,8 +192,20 @@ QTextStream &operator<<(QTextStream &outStream, const ServerConfig &config)
 {
   outStream << "section: links" << Qt::endl;
 
+  // where the monitors really are decides, if the user arranged them
+  const auto displayLinks = config.useMonitorLayout() ? deskflow::computeDisplayLinks(config.placements())
+                                                      : QList<deskflow::DisplayLink>();
+
   for (int i = 0; const auto &computer : config.computers()) {
-    if (!computer.isNull()) {
+    if (!computer.isNull() && config.useMonitorLayout()) {
+      outStream << "\t" << computer.name() << ":\n";
+      for (const auto &link : displayLinks) {
+        // a placement can outlive its computer until the dialog next tidies up
+        if (link.from == computer.name() && config.computerExists(link.to)) {
+          outStream << "\t\t" << link.toConfigLine() << Qt::endl;
+        }
+      }
+    } else if (!computer.isNull()) {
       outStream << "\t" << computer.name() << ":\n";
       for (const auto &neighbour : std::as_const(neighbourDirs)) {
         int idx = config.adjacentComputerIndex(i, neighbour.x, neighbour.y);
@@ -181,6 +226,18 @@ QTextStream &operator<<(QTextStream &outStream, const ServerConfig &config)
   outStream << "end" << Qt::endl << Qt::endl;
 
   return outStream;
+}
+
+bool ServerConfig::updateMonitors(const deskflow::MonitorMap &monitors)
+{
+  const auto linksBefore = deskflow::computeDisplayLinks(m_placements);
+  for (auto &placement : m_placements) {
+    if (const auto found = monitors.constFind(placement.name); found != monitors.constEnd()) {
+      placement.monitors = deskflow::normalizedMonitors(found.value());
+    }
+  }
+  m_placements = deskflow::withoutOverlaps(m_placements);
+  return m_useMonitorLayout && linksBefore != deskflow::computeDisplayLinks(m_placements);
 }
 
 int ServerConfig::numComputers() const

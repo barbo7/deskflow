@@ -834,6 +834,13 @@ void Config::parseAction(
           }
   */
 
+  else if (name == "handoffApp") {
+    if (!args.empty()) {
+      throw ServerConfigReadException(s, "syntax for action: handoffApp");
+    }
+    action = new InputFilter::HandoffAppAction(m_events);
+  }
+
   else if (name == "switchToScreen") {
     if (args.size() != 1) {
       throw ServerConfigReadException(s, "syntax for action: switchToScreen(name)");

@@ -1305,6 +1305,26 @@ IKeyState *OSXComputer::getKeyState() const
   return m_keyState;
 }
 
+deskflow::MonitorList OSXComputer::getMonitors() const
+{
+  CGDirectDisplayID displays[32];
+  CGDisplayCount count = 0;
+  deskflow::MonitorList monitors;
+  if (CGGetActiveDisplayList(32, displays, &count) == CGDisplayNoErr) {
+    for (CGDisplayCount i = 0; i < count; ++i) {
+      if (CGDisplayIsInMirrorSet(displays[i]) && CGDisplayMirrorsDisplay(displays[i]) != kCGNullDirectDisplay) {
+        continue; // a mirror shows another display's area; it adds nothing
+      }
+      const CGRect bounds = CGDisplayBounds(displays[i]);
+      monitors.append(QRect(
+          static_cast<int>(bounds.origin.x), static_cast<int>(bounds.origin.y), static_cast<int>(bounds.size.width),
+          static_cast<int>(bounds.size.height)
+      ));
+    }
+  }
+  return monitors.isEmpty() ? IPlatformComputer::getMonitors() : monitors;
+}
+
 bool OSXComputer::updateComputerShape(const CGDirectDisplayID, const CGDisplayChangeSummaryFlags flags)
 {
   return updateComputerShape();

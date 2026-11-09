@@ -174,8 +174,10 @@ void CoreProcess::connectCoreIpc()
   );
   connect(m_coreIpcClient, &ipc::CoreIpcClient::connected, this, [this] {
     qDebug("connected to core ipc server");
-    if (m_coreIpcClient)
+    if (m_coreIpcClient) {
       m_coreIpcClient->requestActiveComputer();
+      m_coreIpcClient->requestMonitors();
+    }
   });
   connect(m_coreIpcClient, &ipc::CoreIpcClient::connectionFailed, this, [retryLater] {
     qWarning("failed to establish core ipc connection, retrying");
@@ -655,6 +657,19 @@ void CoreProcess::requestSwitchToComputer(const QString &computer)
   m_coreIpcClient->sendSwitchTo(computer);
 }
 
+bool CoreProcess::reloadServerConfig()
+{
+  if (m_coreIpcClient == nullptr || !m_coreIpcClient->isConnected() || !isStarted()) {
+    return false;
+  }
+  if (const auto [canRead, configFile] = persistServerConfig(); !canRead) {
+    qWarning().noquote() << "can't reload the server config, it isn't readable:" << configFile;
+    return false;
+  }
+  m_coreIpcClient->sendReloadConfig();
+  return true;
+}
+
 void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString &args)
 {
   if (command == "connectionState") {
@@ -685,6 +700,10 @@ void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString
       data = QString::fromUtf8(QByteArray::fromBase64(data.toLatin1()));
     }
     Q_EMIT roleSwapRequested(role, data);
+  } else if (command == "monitors") {
+    Q_EMIT monitorsChanged(args);
+  } else if (command == "handoffStatus") {
+    Q_EMIT handoffStatus(args);
   } else if (command == "connectedClients") {
     const auto clients = args.isEmpty() ? QStringList() : args.split(",");
     Q_EMIT connectedClientsChanged(clients);

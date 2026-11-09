@@ -29,9 +29,11 @@ public:
    * can ask for it with `getActiveComputer`.
    */
   void setActiveComputer(const QString &active, const QString &computers);
+  void setMonitors(const QString &monitors);
 
 Q_SIGNALS:
   void switchToComputerRequested(const QString &computer);
+  void reloadConfigRequested();
 
 private:
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;
@@ -40,6 +42,7 @@ private:
 
   QString m_activeComputer;
   QString m_computers;
+  QString m_monitors;
 };
 
 } // namespace deskflow::core::ipc

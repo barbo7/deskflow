@@ -169,6 +169,12 @@ void App::handleComputerError() const
   getEvents()->addEvent(Event(EventTypes::Quit));
 }
 
+void App::requestConfigReload() const
+{
+  // only a server listens for this. EventQueue::addEvent is thread safe.
+  getEvents()->addEvent(Event(EventTypes::ServerAppReloadConfig, getEvents()->getSystemTarget()));
+}
+
 void App::requestSwitchToComputer(const std::string &computer) const
 {
   // EventQueue::addEvent is thread safe; the handler runs on the event thread.

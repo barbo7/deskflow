@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "common/MonitorLayout.h"
 #include "common/Enums.h"
 #include "deskflow/ClipboardChunk.h"
 #include "deskflow/ClipboardTypes.h"
@@ -48,6 +49,31 @@ public:
   //@{
 
   void onInfoChanged();
+
+  //! Tell the server this computer's monitors. Servers before 1.10 don't take them.
+  virtual void sendMonitors(const deskflow::MonitorList &monitors)
+  {
+    (void)monitors;
+  }
+
+  //! Start moving an app. Servers before 1.10 don't take them.
+  virtual void sendHandoffStart(
+      const std::string &target, const std::string &appId, const std::string &url, const std::string &fileName,
+      uint32_t size
+  )
+  {
+    (void)target;
+    (void)appId;
+    (void)url;
+    (void)fileName;
+    (void)size;
+  }
+
+  //! The next piece of the file of the app being moved.
+  virtual void sendHandoffData(const std::string &chunk)
+  {
+    (void)chunk;
+  }
   bool onGrabClipboard(ClipboardID);
   void onClipboardChanged(ClipboardID, const IClipboard *);
 

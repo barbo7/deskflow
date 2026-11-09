@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common/MonitorLayout.h"
 #include "deskflow/IClient.h"
 
 namespace deskflow {
@@ -82,6 +83,46 @@ public:
   virtual void roleSwapAccepted()
   {
     // do nothing
+  }
+
+  //! The computer's physical monitors. Clients before 1.10 count as one monitor.
+  virtual deskflow::MonitorList getMonitors() const
+  {
+    int32_t x = 0;
+    int32_t y = 0;
+    int32_t width = 0;
+    int32_t height = 0;
+    getShape(x, y, width, height);
+    return {QRect(x, y, width, height)};
+  }
+
+  //! Whether apps can be moved to and from this computer.
+  virtual bool supportsHandoff() const
+  {
+    return false;
+  }
+
+  //! Ask the client to send the app in front to \c target. 1.10+ clients only.
+  virtual void requestHandoffCapture(const std::string &target)
+  {
+    (void)target;
+  }
+
+  //! An app is arriving for this client; the file follows. 1.10+ clients only.
+  virtual void sendHandoffStart(
+      const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size
+  )
+  {
+    (void)appId;
+    (void)url;
+    (void)fileName;
+    (void)size;
+  }
+
+  //! The next piece of the file. 1.10+ clients only.
+  virtual void sendHandoffData(const std::string &chunk)
+  {
+    (void)chunk;
   }
 
   //@}

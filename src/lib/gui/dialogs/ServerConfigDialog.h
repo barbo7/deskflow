@@ -13,8 +13,12 @@
 #include "config/ServerConfig.h"
 
 #include <QDialog>
+#include <QSet>
 
 class SettingsDialogButtonBox;
+class MonitorLayoutView;
+class QCheckBox;
+class QLabel;
 class QItemSelection;
 
 namespace Ui {
@@ -32,6 +36,20 @@ public:
   void message(const QString &message)
   {
     m_message = message;
+  }
+
+  /**
+   * What's connected right now, for the Monitors tab. Can be called while the dialog is open.
+   * \param monitors The monitors of each connected computer.
+   * \param connected Names of the connected computers.
+   * \param active Name of the computer that has the cursor.
+   */
+  void setMonitorState(const deskflow::MonitorMap &monitors, const QSet<QString> &connected, const QString &active);
+
+  //! After saving: whether the running server can take the change without dropping connections.
+  [[nodiscard]] bool appliesLive() const
+  {
+    return m_appliesLive;
   }
 
 protected:
@@ -97,6 +115,10 @@ private:
   bool isGeneralConfigModified() const;
   bool isGeneralConfigDefault() const;
   void setButtonBoxEnabledButtons() const;
+  void setupMonitorTab();
+  void syncPlacements();
+  void updateMonitorWarning();
+  [[nodiscard]] bool onlyLayoutChanged() const;
   std::unique_ptr<Ui::ServerConfigDialog> ui;
   QString m_message = "";
   int m_columns;
@@ -120,4 +142,12 @@ private:
   ServerConfig m_serverConfig;
   ComputerSetupModel m_computerSetupModel;
   SettingsDialogButtonBox *m_buttonBox = nullptr;
+  QWidget *m_monitorTab = nullptr;
+  QCheckBox *m_useMonitorLayout = nullptr;
+  MonitorLayoutView *m_monitorView = nullptr;
+  QLabel *m_monitorWarning = nullptr;
+  deskflow::MonitorMap m_monitors;
+  QSet<QString> m_connected;
+  QString m_active;
+  bool m_appliesLive = false;
 };

@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common/MonitorLayout.h"
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/IComputer.h"
 #include "deskflow/KeyTypes.h"
@@ -272,6 +273,7 @@ public:
   void *getEventTarget() const override;
   bool getClipboard(ClipboardID id, IClipboard *) const override;
   void getShape(int32_t &x, int32_t &y, int32_t &width, int32_t &height) const override;
+  [[nodiscard]] deskflow::MonitorList getMonitors() const;
   void getCursorPos(int32_t &x, int32_t &y) const override;
 
   IPlatformComputer *getPlatformComputer()

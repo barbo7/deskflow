@@ -65,6 +65,14 @@ endif()
 
 
 create_test(
+  NAME AppHandoffTests
+  DEPENDS app
+  LIBS base platform ${extra_libs}
+  SOURCE AppHandoffTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/deskflow"
+)
+
+create_test(
   NAME EdgePushAccumulatorTests
   DEPENDS app
   LIBS base ${extra_libs}

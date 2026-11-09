@@ -32,6 +32,16 @@ void CoreIpcClient::requestActiveComputer()
   sendMessage(QStringLiteral("getActiveComputer"));
 }
 
+void CoreIpcClient::requestMonitors()
+{
+  sendMessage(QStringLiteral("getMonitors"));
+}
+
+void CoreIpcClient::sendReloadConfig()
+{
+  sendMessage(QStringLiteral("reloadConfig"));
+}
+
 void CoreIpcClient::processCommand(const QString &command, const QStringList &parts)
 {
   const auto args = parts.size() >= 2 ? parts.at(1) : QString();

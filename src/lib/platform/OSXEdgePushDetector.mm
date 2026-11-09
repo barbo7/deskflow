@@ -53,6 +53,11 @@ public:
   OSXEdgePushDetector(const OSXEdgePushDetector &) = delete;
   OSXEdgePushDetector &operator=(const OSXEdgePushDetector &) = delete;
 
+  void setHandoffCallback(Callback onHandoff)
+  {
+    m_onHandoff = std::move(onHandoff);
+  }
+
   bool start()
   {
     // listen only: the tap never holds up or changes an event
@@ -143,6 +148,12 @@ private:
       return;
     }
 
+    if (CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 4) { // H
+      LOG_INFO("handoff hotkey pressed");
+      m_onHandoff();
+      return;
+    }
+
     uint32_t edge = 0;
     switch (CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)) {
     case 123: // left arrow
@@ -203,6 +214,7 @@ private:
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
   EdgePushAccumulator::Clock::time_point m_lastHotKey;
+  Callback m_onHandoff;
   CFMachPortRef m_tap = nullptr;
   CFMachPortRef m_keyTap = nullptr;
   CFRunLoopRef m_runLoop = nullptr;
@@ -211,12 +223,13 @@ private:
 
 } // namespace
 
-std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush, Callback)
+std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush, Callback, Callback onHandoff)
 {
   if (edges == 0) {
     return nullptr;
   }
   auto detector = std::make_unique<OSXEdgePushDetector>(edges, std::move(onPush));
+  detector->setHandoffCallback(std::move(onHandoff));
   if (!detector->start()) {
     return nullptr;
   }

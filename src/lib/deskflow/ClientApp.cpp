@@ -253,7 +253,8 @@ void ClientApp::startEdgePushDetector()
         events->addEvent(Event(
             EventTypes::AppSwitchToComputerRequest, events->getSystemTarget(), new deskflow::SwitchRequestInfo({})
         ));
-      }
+      },
+      [events] { events->addEvent(Event(EventTypes::AppHandoffRequest, events->getSystemTarget())); }
   );
 }
 
@@ -412,6 +413,13 @@ int ClientApp::mainLoop()
   // the user's own mouse was pushed toward the server (from the edge push detector)
   getEvents()->addHandler(EventTypes::AppRoleSwapRequest, getEvents()->getSystemTarget(), [this](const auto &) {
     requestRoleSwap();
+  });
+
+  // the handoff hotkey was pressed on this computer's own keyboard
+  getEvents()->addHandler(EventTypes::AppHandoffRequest, getEvents()->getSystemTarget(), [this](const auto &) {
+    if (m_client != nullptr) {
+      m_client->captureForHandoff({});
+    }
   });
 
   // run event loop.  if startClient() failed we're supposed to retry

@@ -17,8 +17,12 @@
 #include "dialogs/ComputerSettingsDialog.h"
 #include "dialogs/HotkeyDialog.h"
 #include "gui/widgets/SettingsDialogButtonBox.h"
+#include "gui/widgets/MonitorLayoutView.h"
 
+#include <QCheckBox>
 #include <QFileDialog>
+#include <QLabel>
+#include <QVBoxLayout>
 #include <QMessageBox>
 
 using enum ComputerConfig::SwitchCorner;
@@ -49,6 +53,167 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent, ServerConfig &config)
   if (!deskflow::platform::isWindows())
     ui->cbWin32KeepForeground->setVisible(false);
   initConnections();
+  setupMonitorTab();
+}
+
+void ServerConfigDialog::setupMonitorTab()
+{
+  m_monitorTab = new QWidget(ui->tabWidget);
+  auto *layout = new QVBoxLayout(m_monitorTab);
+
+  m_useMonitorLayout = new QCheckBox(tr("Arrange computers by their monitors (replaces the Computers grid)"), m_monitorTab);
+  layout->addWidget(m_useMonitorLayout);
+
+  auto *hint = new QLabel(
+      tr("Drag a computer to where it really stands; it snaps to the others. "
+         "The cursor can cross along the green lines."),
+      m_monitorTab
+  );
+  hint->setWordWrap(true);
+  layout->addWidget(hint);
+
+  m_monitorView = new MonitorLayoutView(m_monitorTab);
+  layout->addWidget(m_monitorView, 1);
+
+  m_monitorWarning = new QLabel(m_monitorTab);
+  m_monitorWarning->setWordWrap(true);
+  layout->addWidget(m_monitorWarning);
+
+  ui->tabWidget->insertTab(1, m_monitorTab, tr("Monitors"));
+  ui->tabWidget->setTabEnabled(ui->tabWidget->indexOf(m_monitorTab), !ui->groupExternalConfig->isChecked());
+
+  m_useMonitorLayout->setChecked(serverConfig().useMonitorLayout());
+  m_monitorView->setEnabled(serverConfig().useMonitorLayout());
+
+  connect(m_useMonitorLayout, &QCheckBox::toggled, this, [this](bool checked) {
+    serverConfig().setUseMonitorLayout(checked);
+    m_monitorView->setEnabled(checked);
+    updateMonitorWarning();
+    setButtonBoxEnabledButtons();
+  });
+  connect(m_monitorView, &MonitorLayoutView::placementsChanged, this, [this] {
+    serverConfig().setPlacements(m_monitorView->placements());
+    updateMonitorWarning();
+    setButtonBoxEnabledButtons();
+  });
+  connect(&m_computerSetupModel, &ComputerSetupModel::computersChanged, this, &ServerConfigDialog::syncPlacements);
+  connect(ui->tabWidget, &QTabWidget::currentChanged, this, &ServerConfigDialog::setButtonBoxEnabledButtons);
+
+  syncPlacements();
+}
+
+void ServerConfigDialog::setMonitorState(
+    const deskflow::MonitorMap &monitors, const QSet<QString> &connected, const QString &active
+)
+{
+  m_monitors = monitors;
+  m_connected = connected;
+  m_active = active;
+  m_monitorView->setStatus(connected, active);
+  syncPlacements();
+}
+
+void ServerConfigDialog::syncPlacements()
+{
+  using namespace deskflow;
+
+  const auto knownMonitors = [this](const QString &name, const MonitorList &fallback) {
+    if (const auto found = m_monitors.constFind(name); found != m_monitors.constEnd()) {
+      return normalizedMonitors(found.value());
+    }
+    // not connected yet: a typical screen stands in until it reports its own
+    return fallback.isEmpty() ? MonitorList{QRect(0, 0, 1920, 1080)} : fallback;
+  };
+
+  const auto &previous = serverConfig().placements();
+  const auto &computers = std::as_const(serverConfig()).computers();
+
+  // the first time, start from the computer grid so nothing jumps around
+  QList<int> columnWidth(m_columns, 0);
+  QList<int> rowHeight(m_rows, 0);
+  for (int row = 0; row < m_rows; ++row) {
+    for (int column = 0; column < m_columns; ++column) {
+      const auto &computer = computers.at(row * m_columns + column);
+      if (computer.isNull()) {
+        continue;
+      }
+      const ComputerPlacement probe{computer.name(), {}, knownMonitors(computer.name(), {})};
+      columnWidth[column] = std::max(columnWidth[column], probe.bounds().width());
+      rowHeight[row] = std::max(rowHeight[row], probe.bounds().height());
+    }
+  }
+
+  // computers added later go to the right of everything
+  int rightmost = 0;
+  for (const auto &placement : previous) {
+    rightmost = std::max(rightmost, placement.bounds().x() + placement.bounds().width());
+  }
+
+  PlacementList result;
+  int y = 0;
+  for (int row = 0; row < m_rows; ++row) {
+    int x = 0;
+    for (int column = 0; column < m_columns; ++column) {
+      const auto &computer = computers.at(row * m_columns + column);
+      if (!computer.isNull()) {
+        const auto existing = std::find_if(previous.begin(), previous.end(), [&computer](const auto &placement) {
+          return placement.name == computer.name();
+        });
+        ComputerPlacement placement;
+        placement.name = computer.name();
+        if (existing != previous.end()) {
+          placement.pos = existing->pos;
+          placement.monitors = knownMonitors(computer.name(), existing->monitors);
+        } else {
+          placement.monitors = knownMonitors(computer.name(), {});
+          placement.pos = previous.isEmpty() ? QPoint(x, y) : QPoint(rightmost, 0);
+          if (!previous.isEmpty()) {
+            rightmost += placement.bounds().width();
+          }
+        }
+        result.append(placement);
+      }
+      x += columnWidth[column];
+    }
+    y += rowHeight[row];
+  }
+
+  result = withoutOverlaps(result);
+  serverConfig().setPlacements(result);
+  m_monitorView->setPlacements(result);
+  updateMonitorWarning();
+  setButtonBoxEnabledButtons();
+}
+
+void ServerConfigDialog::updateMonitorWarning()
+{
+  const auto cut = m_useMonitorLayout->isChecked() ? deskflow::unreachableComputers(serverConfig().placements())
+                                                   : QStringList();
+  m_monitorWarning->setText(
+      cut.isEmpty() ? QString() : tr("The cursor can't reach %1. Move it so that its monitors touch another computer's.").arg(cut.join(QStringLiteral(", ")))
+  );
+}
+
+bool ServerConfigDialog::onlyLayoutChanged() const
+{
+  const auto named = [](const ServerConfig &config) {
+    QList<Computer> computers;
+    for (const auto &computer : config.computers()) {
+      if (!computer.isNull()) {
+        computers.append(computer);
+      }
+    }
+    std::sort(computers.begin(), computers.end(), [](const Computer &a, const Computer &b) {
+      return a.name() < b.name();
+    });
+    return computers;
+  };
+
+  const bool externalChanged = ui->groupExternalConfig->isChecked() != m_originalServerConfigIsExternal ||
+                               ui->lineConfigFile->text() != m_originalServerConfigUsesExternalFile;
+  return !externalChanged && !ui->groupExternalConfig->isChecked() && !isGeneralConfigModified() &&
+         named(m_originalServerConfig) == named(m_serverConfig) &&
+         m_originalServerConfig.hotkeys() == m_serverConfig.hotkeys();
 }
 
 ServerConfigDialog::~ServerConfigDialog() = default;
@@ -70,6 +235,14 @@ void ServerConfigDialog::save()
       return;
     }
   }
+  // a layout borrowed in a role swap would silently hide what the user just arranged
+  if (m_useMonitorLayout->isChecked() && ui->groupExternalConfig->isChecked() &&
+      ui->lineConfigFile->text().endsWith(ServerConfig::kSwapConfigName)) {
+    ui->groupExternalConfig->setChecked(false);
+  }
+
+  m_appliesLive = onlyLayoutChanged();
+
   // now that the dialog has been accepted, copy the new server config to the
   // original one, which is a reference to the one in MainWindow.
   setOriginalServerConfig(serverConfig());
@@ -359,8 +532,11 @@ void ServerConfigDialog::onComputerRemoved()
 void ServerConfigDialog::toggleExternalConfig(bool checked)
 {
   ui->widgetExternalConfigControls->setEnabled(checked);
-  ui->tabWidget->setTabEnabled(0, !checked);
-  ui->tabWidget->setTabEnabled(1, !checked);
+  ui->tabWidget->setTabEnabled(ui->tabWidget->indexOf(ui->tabComputers), !checked);
+  ui->tabWidget->setTabEnabled(ui->tabWidget->indexOf(ui->tabHotkeys), !checked);
+  if (m_monitorTab != nullptr) {
+    ui->tabWidget->setTabEnabled(ui->tabWidget->indexOf(m_monitorTab), !checked);
+  }
   serverConfig().setUseExternalConfig(checked);
   setButtonBoxEnabledButtons();
 }
@@ -431,6 +607,8 @@ void ServerConfigDialog::resetFromSettings()
   m_serverConfig.setConfigFile(m_originalServerConfigUsesExternalFile);
   m_serverConfig.setUseExternalConfig(m_originalServerConfigIsExternal);
   loadFromConfig();
+  m_useMonitorLayout->setChecked(serverConfig().useMonitorLayout());
+  syncPlacements();
   if (ui->tabWidget->currentWidget() == ui->tabComputers) {
     ui->computerSetupView->reset();
     ui->computerSetupView->update();
@@ -631,5 +809,5 @@ void ServerConfigDialog::setButtonBoxEnabledButtons() const
   const bool writable = Settings::isWritable();
   m_buttonBox->enableSave(writable && (isGeneralConfigModified() || !(m_originalServerConfig == m_serverConfig)));
   m_buttonBox->enableReset(writable && (isGeneralConfigModified() || !(m_originalServerConfig == m_serverConfig)));
-  m_buttonBox->enableRestoreDefaults(writable && !isGeneralConfigDefault() && ui->tabWidget->currentIndex() == 2);
+  m_buttonBox->enableRestoreDefaults(writable && !isGeneralConfigDefault() && ui->tabWidget->currentWidget() == ui->tabAdvanced);
 }

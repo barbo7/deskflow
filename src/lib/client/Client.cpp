@@ -15,6 +15,9 @@
 #include "client/ServerProxy1_7.h"
 #include "client/ServerProxy1_8.h"
 #include "client/ServerProxy1_9.h"
+#include "client/ServerProxy1_10.h"
+#include "deskflow/AppHandoff.h"
+#include "deskflow/AppHandoffEngine.h"
 #include "common/NetworkProtocol.h"
 #include "common/Settings.h"
 #include "deskflow/Clipboard.h"
@@ -71,10 +74,15 @@ Client::Client(
   // register suspend/resume event handlers
   m_events->addHandler(EventTypes::ComputerSuspend, getEventTarget(), [this](const auto &) { handleSuspend(); });
   m_events->addHandler(EventTypes::ComputerResume, getEventTarget(), [this](const auto &) { handleResume(); });
+
+  m_handoff = std::make_unique<deskflow::AppHandoffEngine>(m_events, this);
+  m_events->addHandler(EventTypes::AppHandoffCaptured, this, [this](const auto &e) { handleHandoffCaptured(e); });
 }
 
 Client::~Client()
 {
+  m_handoff.reset();
+  m_events->removeHandler(EventTypes::AppHandoffCaptured, this);
   m_events->removeHandler(EventTypes::ComputerSuspend, getEventTarget());
   m_events->removeHandler(EventTypes::ComputerResume, getEventTarget());
 
@@ -488,6 +496,9 @@ bool Client::setupComputer(int16_t protocolMinor)
   case 9:
     m_server = new ServerProxy1_9(this, m_stream, m_events);
     break;
+  case 10:
+    m_server = new ServerProxy1_10(this, m_stream, m_events);
+    break;
   default:
     break;
   }
@@ -644,6 +655,43 @@ void Client::handleShapeChanged()
 {
   LOG_DEBUG("resolution changed");
   m_server->onInfoChanged();
+  m_server->sendMonitors(getMonitors());
+}
+
+deskflow::MonitorList Client::getMonitors() const
+{
+  return m_computer->getMonitors();
+}
+
+void Client::captureForHandoff(const std::string &target)
+{
+  m_handoff->capture(target);
+}
+
+void Client::handoffStart(const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size)
+{
+  m_handoff->begin(appId, url, fileName, size);
+}
+
+void Client::handoffData(const std::string &chunk)
+{
+  m_handoff->data(chunk);
+}
+
+void Client::handleHandoffCaptured(const Event &event)
+{
+  const auto *capture = dynamic_cast<const deskflow::HandoffCapture *>(event.getDataObject());
+  if (capture == nullptr || m_server == nullptr) {
+    return;
+  }
+
+  m_server->sendHandoffStart(
+      capture->m_target, capture->m_appId, capture->m_url, capture->m_fileName,
+      static_cast<uint32_t>(capture->m_data.size())
+  );
+  for (size_t offset = 0; offset < capture->m_data.size(); offset += deskflow::handoff::kChunkSize) {
+    m_server->sendHandoffData(capture->m_data.substr(offset, deskflow::handoff::kChunkSize));
+  }
 }
 
 void Client::handleClipboardGrabbed(const Event &event)

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "common/MonitorLayout.h"
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/IComputer.h"
 #include "deskflow/IKeyState.h"
@@ -48,6 +49,21 @@ public:
   be reported.
   */
   virtual void disable() = 0;
+
+  //! Get the physical monitors
+  /*!
+  Returns each monitor's area, in the same coordinates as getShape(). Platforms that can't
+  tell them apart report the whole desktop as one monitor.
+  */
+  virtual deskflow::MonitorList getMonitors() const
+  {
+    int32_t x = 0;
+    int32_t y = 0;
+    int32_t width = 0;
+    int32_t height = 0;
+    getShape(x, y, width, height);
+    return {QRect(x, y, width, height)};
+  }
 
   //! Enter computer
   /*!

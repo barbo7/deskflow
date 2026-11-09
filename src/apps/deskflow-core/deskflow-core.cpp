@@ -130,6 +130,10 @@ int main(int argc, char **argv)
       [coreApp](const QString &computer) { coreApp->requestSwitchToComputer(computer.toStdString()); },
       Qt::DirectConnection
   );
+  QObject::connect(
+      ipcServer, &deskflow::core::ipc::CoreIpcServer::reloadConfigRequested, coreApp,
+      [coreApp] { coreApp->requestConfigReload(); }, Qt::DirectConnection
+  );
   ipcServer->listen();
 
   QThread coreThread;
