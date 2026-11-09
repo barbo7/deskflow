@@ -178,7 +178,7 @@ void ServerConfigDialog::syncPlacements()
     y += rowHeight[row];
   }
 
-  result = withoutOverlaps(result);
+  result = withoutOverlaps(keepNeighboursTouching(previous, result));
   serverConfig().setPlacements(result);
   m_monitorView->setPlacements(result);
   updateMonitorWarning();

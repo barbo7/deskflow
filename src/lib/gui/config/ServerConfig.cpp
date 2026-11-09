@@ -231,12 +231,13 @@ QTextStream &operator<<(QTextStream &outStream, const ServerConfig &config)
 bool ServerConfig::updateMonitors(const deskflow::MonitorMap &monitors)
 {
   const auto linksBefore = deskflow::computeDisplayLinks(m_placements);
+  const auto before = m_placements;
   for (auto &placement : m_placements) {
     if (const auto found = monitors.constFind(placement.name); found != monitors.constEnd()) {
       placement.monitors = deskflow::normalizedMonitors(found.value());
     }
   }
-  m_placements = deskflow::withoutOverlaps(m_placements);
+  m_placements = deskflow::withoutOverlaps(deskflow::keepNeighboursTouching(before, m_placements));
   return m_useMonitorLayout && linksBefore != deskflow::computeDisplayLinks(m_placements);
 }
 

@@ -86,6 +86,11 @@ QPoint snapPlacement(const PlacementList &placements, int index, const QPoint &p
 //! out to have more or larger monitors than it was placed with. Earlier computers stay put.
 PlacementList withoutOverlaps(const PlacementList &placements);
 
+//! Moves computers so that those touching in \p before still touch in \p after, as can stop being
+//! the case when a computer turns out to have smaller or larger monitors than it was placed with.
+//! Computers are matched by name; those that didn't touch anything stay where they are.
+PlacementList keepNeighboursTouching(const PlacementList &before, const PlacementList &after);
+
 //! Computers that have no link to any other computer, so the cursor could never reach them.
 QStringList unreachableComputers(const PlacementList &placements);
 

@@ -166,4 +166,59 @@ void MonitorLayoutTests::withoutOverlaps_movesLaterComputersRight()
   QCOMPARE(result.at(2).pos, QPoint(6400, 0));
 }
 
+void MonitorLayoutTests::keepTouching_narrowerComputerOnTheLeft()
+{
+  // placed with a stand-in 1920 wide screen, then reports its real 1470
+  const PlacementList before = {
+      computer(QStringLiteral("mac"), {0, 0}, {QRect(0, 0, 1920, 1080)}),
+      computer(QStringLiteral("pc"), {1920, 0}, {QRect(1920, 0, 1920, 1080), QRect(0, 0, 1920, 1080)}),
+  };
+  auto after = before;
+  after[0].monitors = {QRect(0, 0, 1470, 956)};
+
+  const auto result = keepNeighboursTouching(before, after);
+  QCOMPARE(result.at(0).pos, QPoint(0, 0));
+  QCOMPARE(result.at(1).pos, QPoint(1470, 0));
+  QVERIFY(!computeDisplayLinks(result).isEmpty());
+}
+
+void MonitorLayoutTests::keepTouching_carriesAlongARow()
+{
+  const PlacementList before = {
+      computer(QStringLiteral("a"), {0, 0}, {QRect(0, 0, 1920, 1080)}),
+      computer(QStringLiteral("b"), {1920, 0}, {QRect(0, 0, 1000, 1080)}),
+      computer(QStringLiteral("c"), {2920, 0}, {QRect(0, 0, 1000, 1080)}),
+  };
+  auto after = before;
+  after[0].monitors = {QRect(0, 0, 1470, 1080)};
+
+  const auto result = keepNeighboursTouching(before, after);
+  QCOMPARE(result.at(1).pos, QPoint(1470, 0));
+  QCOMPARE(result.at(2).pos, QPoint(2470, 0));
+}
+
+void MonitorLayoutTests::keepTouching_vertical()
+{
+  const PlacementList before = {
+      computer(QStringLiteral("top"), {0, 0}, {QRect(0, 0, 1920, 1080)}),
+      computer(QStringLiteral("bottom"), {0, 1080}, {QRect(0, 0, 1920, 1080)}),
+  };
+  auto after = before;
+  after[0].monitors = {QRect(0, 0, 1920, 956)};
+
+  QCOMPARE(keepNeighboursTouching(before, after).at(1).pos, QPoint(0, 956));
+}
+
+void MonitorLayoutTests::keepTouching_leavesSeparateComputersAlone()
+{
+  const PlacementList before = {
+      computer(QStringLiteral("a"), {0, 0}, {QRect(0, 0, 1920, 1080)}),
+      computer(QStringLiteral("b"), {2500, 0}, {QRect(0, 0, 1920, 1080)}),
+  };
+  auto after = before;
+  after[0].monitors = {QRect(0, 0, 1470, 956)};
+
+  QCOMPARE(keepNeighboursTouching(before, after).at(1).pos, QPoint(2500, 0));
+}
+
 QTEST_MAIN(MonitorLayoutTests)

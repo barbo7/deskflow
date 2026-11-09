@@ -25,4 +25,8 @@ private Q_SLOTS:
   void overlaps_detected();
   void unreachable_listed();
   void withoutOverlaps_movesLaterComputersRight();
+  void keepTouching_narrowerComputerOnTheLeft();
+  void keepTouching_carriesAlongARow();
+  void keepTouching_vertical();
+  void keepTouching_leavesSeparateComputersAlone();
 };
