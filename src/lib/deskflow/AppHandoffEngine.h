@@ -54,6 +54,14 @@ public:
   //! Looks at the app in front and posts an AppHandoffCaptured event if there's something to send.
   void capture(const std::string &target);
 
+  /**
+   * The same, but only if a window really is being dragged by its title bar, and ending the drag.
+   * \param target Computer to send to; empty lets the server pick.
+   * \param releaseButton Let go of the left button here: the drag was made with this computer's
+   *        own mouse. When the server's mouse made it, the server sends the button up instead.
+   */
+  void captureDraggedWindow(const std::string &target, bool releaseButton);
+
   //! Starts receiving. With \p size 0 this opens the app straight away.
   void begin(const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size);
 
@@ -64,6 +72,7 @@ private:
   void post(std::function<void()> job);
   void run();
   void reset();
+  void captureAndPost(const std::string &target, bool dragged, bool releaseButton);
   static void open(const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data);
 
   IEventQueue *m_events;

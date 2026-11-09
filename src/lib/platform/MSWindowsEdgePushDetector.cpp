@@ -40,6 +40,13 @@ public:
   {
   }
 
+  void setDragCallback(uint32_t dragEdges, DragCallback onDragPush)
+  {
+    m_dragEdges = dragEdges;
+    m_dragAccumulator = EdgePushAccumulator(dragEdges, kPushThreshold);
+    m_onDragPush = std::move(onDragPush);
+  }
+
   void setHandoffCallback(Callback onHandoff)
   {
     m_onHandoff = std::move(onHandoff);
@@ -116,7 +123,7 @@ private:
       }
     }
 
-    if (!RegisterHotKey(window, kHandoffHotKey, MOD_CONTROL | MOD_ALT | MOD_WIN | MOD_NOREPEAT, 'H')) {
+    if (m_onHandoff && !RegisterHotKey(window, kHandoffHotKey, MOD_CONTROL | MOD_ALT | MOD_WIN | MOD_NOREPEAT, 'H')) {
       LOG_WARN("can't register the ctrl+alt+win+H hotkey, another app may be using it");
     }
 
@@ -223,7 +230,7 @@ private:
     const auto *input = reinterpret_cast<const RAWINPUT *>(buffer.data());
 
     // injected input (e.g. from deskflow itself) has no device; only the user's hand counts
-    if (m_edges == 0 || input->header.dwType != RIM_TYPEMOUSE || input->header.hDevice == nullptr) {
+    if ((m_edges == 0 && m_dragEdges == 0) || input->header.dwType != RIM_TYPEMOUSE || input->header.hDevice == nullptr) {
       return;
     }
     const RAWMOUSE &mouse = input->data.mouse;
@@ -239,6 +246,24 @@ private:
     const int top = GetSystemMetrics(SM_YVIRTUALSCREEN);
     const int right = left + GetSystemMetrics(SM_CXVIRTUALSCREEN) - 1;
     const int bottom = top + GetSystemMetrics(SM_CYVIRTUALSCREEN) - 1;
+
+    // before the check below: windows confines the cursor while it moves a window
+    const int dragKey = GetSystemMetrics(SM_SWAPBUTTON) != 0 ? VK_RBUTTON : VK_LBUTTON;
+    if ((GetAsyncKeyState(dragKey) & 0x8000) != 0) {
+      EdgePushAccumulator::Edges edge;
+      edge.left = cursor.x <= left;
+      edge.right = cursor.x >= right;
+      edge.top = cursor.y <= top;
+      edge.bottom = cursor.y >= bottom;
+
+      const auto pushX = static_cast<double>(mouse.lLastX);
+      const auto pushY = static_cast<double>(mouse.lLastY);
+      if (m_onDragPush && m_dragAccumulator.feed(pushX, pushY, edge, EdgePushAccumulator::Clock::now())) {
+        LOG_DEBUG("pushed against an edge with the left button held");
+        m_onDragPush(EdgePushAccumulator::pushDirection(pushX, pushY, edge));
+      }
+      return;
+    }
 
     // a game (or any app) that confines the cursor keeps it: never swap roles mid-game
     RECT clip;
@@ -274,6 +299,9 @@ private:
   uint32_t m_edges;
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
+  uint32_t m_dragEdges = 0;
+  EdgePushAccumulator m_dragAccumulator{0, kPushThreshold};
+  DragCallback m_onDragPush;
   Callback m_onHandoff;
   Callback m_onInputBlocked;
   bool m_inputBlocked = false;
@@ -285,11 +313,15 @@ private:
 } // namespace
 
 std::unique_ptr<EdgePushDetector>
-EdgePushDetector::create(uint32_t edges, Callback onPush, Callback onInputBlocked, Callback onHandoff)
+EdgePushDetector::create(
+    uint32_t edges, Callback onPush, Callback onInputBlocked, Callback onHandoff, uint32_t dragEdges,
+    DragCallback onDragPush
+)
 {
   // runs even with no edges to watch, to notice screens deskflow can't control
   auto detector = std::make_unique<MSWindowsEdgePushDetector>(edges, std::move(onPush), std::move(onInputBlocked));
   detector->setHandoffCallback(std::move(onHandoff));
+  detector->setDragCallback(dragEdges, std::move(onDragPush));
   if (!detector->start()) {
     return nullptr;
   }

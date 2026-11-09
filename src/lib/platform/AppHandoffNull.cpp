@@ -22,6 +22,21 @@ void closeCapturedTab(const CapturedApp &)
   // nothing was captured
 }
 
+bool isWindowBeingDragged()
+{
+  return false;
+}
+
+void cancelWindowDrag()
+{
+  // nothing to cancel
+}
+
+void releaseLeftButton()
+{
+  // nothing to release
+}
+
 bool launchApp(const App &, const QString &)
 {
   return false;

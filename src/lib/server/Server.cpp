@@ -500,6 +500,57 @@ std::string Server::nextHandoffTarget(const BaseClientProxy *source) const
   return {};
 }
 
+std::string Server::dragTarget(Direction direction) const
+{
+  if (direction == Direction::NoDirection) {
+    return {};
+  }
+
+  int32_t ax;
+  int32_t ay;
+  int32_t aw;
+  int32_t ah;
+  m_active->getShape(ax, ay, aw, ah);
+  const bool horizontal = direction == Direction::Left || direction == Direction::Right;
+  const auto along = horizontal ? static_cast<float>(m_y - ay) / static_cast<float>(ah)
+                                : static_cast<float>(m_x - ax) / static_cast<float>(aw);
+
+  const auto name = m_config->getNeighbor(getName(m_active), direction, std::clamp(along, 0.0f, 0.999f), nullptr);
+  const auto index = m_clients.find(name);
+  return index != m_clients.end() && index->second->supportsHandoff() ? name : std::string();
+}
+
+void Server::feedRemoteDragPush(int32_t dx, int32_t dy, int32_t ax, int32_t ay, int32_t aw, int32_t ah)
+{
+  if (!m_leftButtonDown || !m_active->supportsHandoff()) {
+    return;
+  }
+
+  deskflow::EdgePushAccumulator::Edges at;
+  at.left = m_x < ax;
+  at.right = m_x > ax + aw - 1;
+  at.top = m_y < ay;
+  at.bottom = m_y > ay + ah - 1;
+  if (!m_dragPush.feed(dx, dy, at, deskflow::EdgePushAccumulator::Clock::now())) {
+    return;
+  }
+
+  const auto target = dragTarget(deskflow::EdgePushAccumulator::pushDirection(dx, dy, at));
+  if (!target.empty()) {
+    m_active->requestHandoffDrag(target);
+  }
+}
+
+void Server::handleLocalDragPush(Direction direction)
+{
+  if (m_active != m_primaryClient) {
+    return;
+  }
+  if (const auto target = dragTarget(direction); !target.empty()) {
+    m_handoff->captureDraggedWindow(target, true);
+  }
+}
+
 void Server::startHandoffFromActive()
 {
   if (m_active == nullptr || !m_active->supportsHandoff()) {
@@ -557,6 +608,13 @@ void Server::handleHandoffStart(
   } else {
     index->second->sendHandoffStart(appId, url, fileName, size);
   }
+
+  // a dragged window's button is still down over there: this ends the drag where it started.
+  // the real button comes up later, on the computer the cursor is on by then, where it's harmless
+  if (m_leftButtonDown && source == m_active && source != m_primaryClient) {
+    source->mouseUp(kButtonLeft);
+  }
+  m_leftButtonDown = false;
 
   // the cursor goes with the app
   switchToComputerByName(name);
@@ -1887,6 +1945,10 @@ void Server::onMouseDown(ButtonID id)
   LOG_VERBOSE("onMouseDown id=%d", id);
   assert(m_active != nullptr);
 
+  if (id == kButtonLeft) {
+    m_leftButtonDown = true;
+  }
+
   // relay
   m_active->mouseDown(id);
 }
@@ -1895,6 +1957,10 @@ void Server::onMouseUp(ButtonID id)
 {
   LOG_VERBOSE("onMouseUp id=%d", id);
   assert(m_active != nullptr);
+
+  if (id == kButtonLeft) {
+    m_leftButtonDown = false;
+  }
 
   // relay
   m_active->mouseUp(id);
@@ -2146,6 +2212,7 @@ void Server::onMouseMoveSecondary(int32_t dx, int32_t dy)
     // same computer.  clamp mouse to edge.
     m_x = xOld + dx;
     m_y = yOld + dy;
+    feedRemoteDragPush(dx, dy, ax, ay, aw, ah);
     if (m_x < ax) {
       m_x = ax;
       LOG_VERBOSE("clamp to left of \"%s\"", getName(m_active).c_str());

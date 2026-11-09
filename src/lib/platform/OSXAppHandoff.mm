@@ -155,6 +155,77 @@ void closeCapturedTab(const CapturedApp &app)
   }
 }
 
+bool isWindowBeingDragged()
+{
+  if (!CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft)) {
+    return false;
+  }
+
+  AXUIElementRef systemWide = AXUIElementCreateSystemWide();
+  CFTypeRef app = nullptr;
+  const auto error = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, &app);
+  CFRelease(systemWide);
+  if (error != kAXErrorSuccess || app == nullptr) {
+    return false;
+  }
+
+  CFTypeRef window = nullptr;
+  AXUIElementCopyAttributeValue(static_cast<AXUIElementRef>(app), kAXFocusedWindowAttribute, &window);
+  CFRelease(app);
+  if (window == nullptr) {
+    return false;
+  }
+
+  CFTypeRef positionValue = nullptr;
+  CFTypeRef sizeValue = nullptr;
+  AXUIElementCopyAttributeValue(static_cast<AXUIElementRef>(window), kAXPositionAttribute, &positionValue);
+  AXUIElementCopyAttributeValue(static_cast<AXUIElementRef>(window), kAXSizeAttribute, &sizeValue);
+  CFRelease(window);
+
+  CGPoint position = CGPointZero;
+  CGSize size = CGSizeZero;
+  bool known = false;
+  if (positionValue != nullptr && sizeValue != nullptr) {
+    known = AXValueGetValue(static_cast<AXValueRef>(positionValue), kAXValueTypeCGPoint, &position) &&
+            AXValueGetValue(static_cast<AXValueRef>(sizeValue), kAXValueTypeCGSize, &size);
+  }
+  if (positionValue != nullptr) {
+    CFRelease(positionValue);
+  }
+  if (sizeValue != nullptr) {
+    CFRelease(sizeValue);
+  }
+  if (!known) {
+    return false;
+  }
+
+  CGEventRef now = CGEventCreate(nullptr);
+  const CGPoint cursor = CGEventGetLocation(now);
+  CFRelease(now);
+
+  // macOS can't say a window is being dragged, but a window follows the cursor by the strip
+  // along its top: its title bar, or the tabs of a browser
+  const double kTitleStrip = 56.0;
+  return cursor.x >= position.x - 2 && cursor.x <= position.x + size.width + 2 && cursor.y >= position.y - 2 &&
+         cursor.y <= position.y + kTitleStrip;
+}
+
+void cancelWindowDrag()
+{
+  // macOS has no way to take back a window drag
+}
+
+void releaseLeftButton()
+{
+  CGEventRef now = CGEventCreate(nullptr);
+  const CGPoint cursor = CGEventGetLocation(now);
+  CFRelease(now);
+
+  CGEventRef up = CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseUp, cursor, kCGMouseButtonLeft);
+  CGEventPost(kCGHIDEventTap, up);
+  CFRelease(up);
+}
+
 bool launchApp(const App &app, const QString &target)
 {
   for (const auto &bundleId : app.macBundleIds) {

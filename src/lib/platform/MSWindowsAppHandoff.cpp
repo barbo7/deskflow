@@ -247,6 +247,56 @@ void closeCapturedTab(const CapturedApp &app)
   SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
 }
 
+bool isWindowBeingDragged()
+{
+  const int dragKey = GetSystemMetrics(SM_SWAPBUTTON) != 0 ? VK_RBUTTON : VK_LBUTTON;
+  if ((GetAsyncKeyState(dragKey) & 0x8000) == 0) {
+    return false;
+  }
+
+  HWND window = GetForegroundWindow();
+  if (window == nullptr) {
+    return false;
+  }
+
+  GUITHREADINFO info{};
+  info.cbSize = sizeof(info);
+  if (GetGUIThreadInfo(GetWindowThreadProcessId(window, nullptr), &info) && (info.flags & GUI_INMOVESIZE) != 0) {
+    return true;
+  }
+
+  // browsers drag tabs themselves, so windows doesn't know about those: go by the tab strip
+  const auto *known = findAppByWindowsExe(QFileInfo(windowProgram(window)).fileName());
+  if (known == nullptr || !known->isBrowser) {
+    return false;
+  }
+  RECT area;
+  POINT cursor;
+  if (!GetWindowRect(window, &area) || !GetCursorPos(&cursor)) {
+    return false;
+  }
+  return PtInRect(&area, cursor) && cursor.y < area.top + 3 * GetSystemMetrics(SM_CYCAPTION);
+}
+
+void cancelWindowDrag()
+{
+  std::array<INPUT, 2> inputs{};
+  for (auto &input : inputs) {
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = VK_ESCAPE;
+  }
+  inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+  SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+}
+
+void releaseLeftButton()
+{
+  INPUT input{};
+  input.type = INPUT_MOUSE;
+  input.mi.dwFlags = GetSystemMetrics(SM_SWAPBUTTON) != 0 ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
+  SendInput(1, &input, sizeof(INPUT));
+}
+
 bool launchApp(const App &app, const QString &target)
 {
   const auto arguments =

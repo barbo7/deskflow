@@ -56,6 +56,7 @@ const char *const kMsgDSwapRequest = "DSRQ%s";
 const char *const kMsgDSwapGo = "DSGO";
 const char *const kMsgDMonitors = "DMON%s";
 const char *const kMsgDHandoffRequest = "DHRQ%s";
+const char *const kMsgDHandoffDrag = "DHDR%s";
 const char *const kMsgDHandoffStart = "DHST%s%s%s%s%4i";
 const char *const kMsgDHandoffData = "DHDT%s";
 const char *const kMsgQInfo = "QINF";

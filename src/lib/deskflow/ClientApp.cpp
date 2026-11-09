@@ -254,7 +254,13 @@ void ClientApp::startEdgePushDetector()
             EventTypes::AppSwitchToComputerRequest, events->getSystemTarget(), new deskflow::SwitchRequestInfo({})
         ));
       },
-      [events] { events->addEvent(Event(EventTypes::AppHandoffRequest, events->getSystemTarget())); }
+      [events] { events->addEvent(Event(EventTypes::AppHandoffRequest, events->getSystemTarget())); },
+      m_client->swapEdges(),
+      [events](Direction direction) {
+        events->addEvent(
+            Event(EventTypes::AppDragPush, events->getSystemTarget(), new deskflow::DragPushInfo(direction))
+        );
+      }
   );
 }
 
@@ -413,6 +419,13 @@ int ClientApp::mainLoop()
   // the user's own mouse was pushed toward the server (from the edge push detector)
   getEvents()->addHandler(EventTypes::AppRoleSwapRequest, getEvents()->getSystemTarget(), [this](const auto &) {
     requestRoleSwap();
+  });
+
+  // a window was pushed against the edge leading to the server, with this computer's own mouse
+  getEvents()->addHandler(EventTypes::AppDragPush, getEvents()->getSystemTarget(), [this](const auto &) {
+    if (m_client != nullptr) {
+      m_client->captureDraggedWindow({}, true);
+    }
   });
 
   // the handoff hotkey was pressed on this computer's own keyboard

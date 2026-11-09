@@ -108,6 +108,12 @@ public:
     (void)target;
   }
 
+  //! Ask the client to send \c target the window being dragged, if any. 1.10+ clients only.
+  virtual void requestHandoffDrag(const std::string &target)
+  {
+    (void)target;
+  }
+
   //! An app is arriving for this client; the file follows. 1.10+ clients only.
   virtual void sendHandoffStart(
       const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size

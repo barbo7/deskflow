@@ -70,6 +70,13 @@ bool ServerProxy1_10::parseMessage1_10(const uint8_t *code)
     return true;
   }
 
+  if (memcmp(code, kMsgDHandoffDrag, 4) == 0) {
+    std::string target;
+    ProtocolUtil::readf(getStream(), kMsgDHandoffDrag + 4, &target);
+    getClient()->captureDraggedWindow(target, false);
+    return true;
+  }
+
   if (memcmp(code, kMsgDHandoffStart, 4) == 0) {
     std::string target;
     std::string appId;

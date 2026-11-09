@@ -25,6 +25,7 @@ public:
     return true;
   }
   void requestHandoffCapture(const std::string &target) override;
+  void requestHandoffDrag(const std::string &target) override;
   void sendHandoffStart(
       const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size
   ) override;

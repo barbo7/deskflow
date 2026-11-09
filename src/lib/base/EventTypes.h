@@ -174,6 +174,10 @@ enum class EventTypes : uint32_t
   /// keyboard. No data.
   AppHandoffRequest,
 
+  /// A window was dragged by its title bar and pushed against an edge, on this computer's own
+  /// mouse. Sent to the app's system target. The data is a DragPushInfo.
+  AppDragPush,
+
   /// The app in front has been looked at and is ready to send. The data is a HandoffCapture.
   AppHandoffCaptured,
 

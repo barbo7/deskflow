@@ -217,6 +217,12 @@ public:
   //! Send the app in front to \p target; empty lets the server pick.
   void captureForHandoff(const std::string &target);
 
+  /**
+   * Send the window being dragged to \p target, if one is.
+   * \param releaseButton Let go of the left button too; see AppHandoffEngine.
+   */
+  void captureDraggedWindow(const std::string &target, bool releaseButton);
+
   //! An app is arriving; \p size bytes of its file follow through handoffData().
   void handoffStart(const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size);
 

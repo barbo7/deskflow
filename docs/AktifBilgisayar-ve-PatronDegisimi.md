@@ -259,7 +259,16 @@ kutusu işaretlenince bilgisayarlar sürüklenebilir, yaklaştıkları kenara ya
 
 ### Uygulama taşıma
 
-Öndeki uygulamayı bir sonraki bilgisayara gönderir, imleç de onunla gider.
+**Fareyle:** pencereyi başlığından (tarayıcıda sekmesinden) tut, öbür bilgisayara bakan kenara götür ve
+tuşu bırakmadan **kenara doğru itmeye devam et**. Uygulama karşıda açılır, imleç de oraya geçer. Kenara
+sadece değmek yetmez, böylece Windows'un yarım ekran yerleştirmesi bozulmaz. Windows'ta sürüklenen pencere
+başladığı yere döner; Mac'te bırakıldığı yerde kalır.
+
+Metin seçerken ya da dosya sürüklerken kenara itmek bir şey yapmaz: yalnızca başlık çubuğundan tutulan
+pencere ve tarayıcı sekmesi sayılır. Mac pencerenin sürüklendiğini söyleyemediği için orada imlecin
+pencerenin üst şeridinde olmasına bakılır.
+
+**Kısayolla:** öndeki uygulamayı bir sonraki bilgisayara gönderir.
 
 | Kısayol | Nerede |
 |---|---|
@@ -294,6 +303,7 @@ türleri kabul edilir; dosya adları temizlenir.
 |---|---|---|
 | `DMON` | Yardımcı → patron | Monitörler (`x,y,g,y;...`) |
 | `DHRQ` | Patron → yardımcı | "Öndeki uygulamayı şuna gönder" |
+| `DHDR` | Patron → yardımcı | "Sürüklenen bir pencere varsa şuna gönder" |
 | `DHST` | İki yönlü | Hedef, uygulama, adres, dosya adı, boyut |
 | `DHDT` | İki yönlü | Dosyanın bir parçası (512 KB) |
 

@@ -34,6 +34,19 @@ void EdgePushAccumulatorTests::feed_pushIntoWatchedEdge_triggersAtThreshold()
   QVERIFY(push.feed(40, 0, atRight(), now += 10ms));
 }
 
+void EdgePushAccumulatorTests::pushDirection_findsTheEdge()
+{
+  EdgePushAccumulator::Edges at;
+  at.right = true;
+  QCOMPARE(EdgePushAccumulator::pushDirection(5, 0, at), Direction::Right);
+  QCOMPARE(EdgePushAccumulator::pushDirection(-5, 0, at), Direction::NoDirection);
+  QCOMPARE(EdgePushAccumulator::pushDirection(0, 5, at), Direction::NoDirection);
+
+  at = {};
+  at.top = true;
+  QCOMPARE(EdgePushAccumulator::pushDirection(0, -5, at), Direction::Top);
+}
+
 void EdgePushAccumulatorTests::feed_pushIntoUnwatchedEdge_neverTriggers()
 {
   EdgePushAccumulator push(kRight, 100);

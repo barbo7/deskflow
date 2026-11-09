@@ -32,6 +32,12 @@ void ClientProxy1_10::requestHandoffCapture(const std::string &target)
   ProtocolUtil::writef(getStream(), kMsgDHandoffRequest, &target);
 }
 
+void ClientProxy1_10::requestHandoffDrag(const std::string &target)
+{
+  LOG_DEBUG("ask \"%s\" to send a dragged window to \"%s\"", getName().c_str(), target.c_str());
+  ProtocolUtil::writef(getStream(), kMsgDHandoffDrag, &target);
+}
+
 void ClientProxy1_10::sendHandoffStart(
     const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size
 )

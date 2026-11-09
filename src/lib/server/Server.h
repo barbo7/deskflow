@@ -13,6 +13,7 @@
 #include "common/NetworkProtocol.h"
 #include "deskflow/Clipboard.h"
 #include "deskflow/ClipboardTypes.h"
+#include "deskflow/EdgePushAccumulator.h"
 #include "deskflow/KeyTypes.h"
 #include "deskflow/MouseTypes.h"
 #include "server/Config.h"
@@ -203,6 +204,9 @@ public:
   void getClients(std::vector<std::string> &list) const;
   void sendConnectedClientsIpc() const;
 
+  //! A window was pushed against \p direction's edge with this computer's own mouse.
+  void handleLocalDragPush(Direction direction);
+
   //! Tell the gui about the monitors of every connected computer.
   void notifyMonitors() const;
 
@@ -337,6 +341,8 @@ private:
   // event handlers
   void handleShapeChanged(BaseClientProxy *client);
   void startHandoffFromActive();
+  void feedRemoteDragPush(int32_t dx, int32_t dy, int32_t ax, int32_t ay, int32_t aw, int32_t ah);
+  std::string dragTarget(Direction direction) const;
   void handleHandoffCaptured(const Event &event);
   std::string nextHandoffTarget(const BaseClientProxy *source) const;
   void handleClipboardGrabbed(const Event &event, BaseClientProxy *client);
@@ -422,6 +428,8 @@ private:
   std::unique_ptr<deskflow::AppHandoffEngine> m_handoff;
   //! Which computer the app each source is currently moving goes to.
   std::map<const BaseClientProxy *, std::string> m_handoffRoutes;
+  bool m_leftButtonDown = false;
+  deskflow::EdgePushAccumulator m_dragPush{deskflow::kAllEdgesMask, 80.0};
 
   // state saved when screen saver activates
   BaseClientProxy *m_activeSaver = nullptr;

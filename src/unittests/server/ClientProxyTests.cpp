@@ -334,6 +334,25 @@ void ClientProxyTests::requestHandoffCapture()
   QCOMPARE(test.stream->take(), expected);
 }
 
+void ClientProxyTests::requestHandoffDrag_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.9") << 9 << QByteArray();
+  QTest::newRow("1.10") << 10 << "DHDR" + QByteArray::fromHex("00000002") + "pc";
+}
+
+void ClientProxyTests::requestHandoffDrag()
+{
+  QFETCH(int, minor);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->requestHandoffDrag("pc");
+  QCOMPARE(test.stream->take(), expected);
+}
+
 void ClientProxyTests::supportsHandoff_from1_10()
 {
   QVERIFY(!ProxyUnderTest(9).proxy->supportsHandoff());

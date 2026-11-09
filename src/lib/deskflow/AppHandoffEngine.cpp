@@ -15,6 +15,8 @@
 #include <QFile>
 #include <QFileInfo>
 
+#include <chrono>
+#include <thread>
 #include <utility>
 
 namespace deskflow {
@@ -79,47 +81,72 @@ void AppHandoffEngine::run()
 
 void AppHandoffEngine::capture(const std::string &target)
 {
-  post([this, target] {
-    const auto captured = captureFrontApp();
-    if (captured.isEmpty()) {
-      const auto name = captured.displayName.isEmpty() ? QStringLiteral("This app") : captured.displayName;
-      LOG_INFO("app handoff: nothing to send from \"%s\"", qPrintable(name));
-      tellUser(QStringLiteral("%1 can't be moved: it isn't available on the other computer").arg(name));
-      return;
+  post([this, target] { captureAndPost(target, false, false); });
+}
+
+void AppHandoffEngine::captureDraggedWindow(const std::string &target, bool releaseButton)
+{
+  post([this, target, releaseButton] { captureAndPost(target, true, releaseButton); });
+}
+
+void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, bool releaseButton)
+{
+  // a button held at the edge is usually something else, like selecting text
+  if (dragged && !isWindowBeingDragged()) {
+    LOG_DEBUG("app handoff: pushed against an edge, but no window is being dragged");
+    return;
+  }
+
+  const auto captured = captureFrontApp();
+  if (captured.isEmpty()) {
+    const auto name = captured.displayName.isEmpty() ? QStringLiteral("This app") : captured.displayName;
+    LOG_INFO("app handoff: nothing to send from \"%s\"", qPrintable(name));
+    tellUser(QStringLiteral("%1 can't be moved: it isn't available on the other computer").arg(name));
+    return;
+  }
+
+  auto *info = new HandoffCapture;
+  info->m_target = target;
+  info->m_appId = captured.appId.toStdString();
+  info->m_url = captured.url.toStdString();
+
+  if (!captured.filePath.isEmpty()) {
+    QFile file(captured.filePath);
+    if (file.size() > kMaxFileSize) {
+      LOG_WARN("app handoff: \"%s\" is too large to send", qPrintable(captured.filePath));
+      tellUser(QStringLiteral("%1 is too large to send, opening the app only").arg(QFileInfo(file).fileName()));
+    } else if (file.open(QIODevice::ReadOnly)) {
+      const auto bytes = file.readAll();
+      info->m_data.assign(bytes.constData(), static_cast<size_t>(bytes.size()));
+      info->m_fileName = QFileInfo(file).fileName().toStdString();
+    } else {
+      LOG_WARN("app handoff: can't read \"%s\"", qPrintable(captured.filePath));
     }
+  }
 
-    auto *info = new HandoffCapture;
-    info->m_target = target;
-    info->m_appId = captured.appId.toStdString();
-    info->m_url = captured.url.toStdString();
+  if (info->m_appId.empty() && info->m_url.empty() && info->m_fileName.empty()) {
+    delete info;
+    return;
+  }
 
-    if (!captured.filePath.isEmpty()) {
-      QFile file(captured.filePath);
-      if (file.size() > kMaxFileSize) {
-        LOG_WARN("app handoff: \"%s\" is too large to send", qPrintable(captured.filePath));
-        tellUser(QStringLiteral("%1 is too large to send, opening the app only").arg(QFileInfo(file).fileName()));
-      } else if (file.open(QIODevice::ReadOnly)) {
-        const auto bytes = file.readAll();
-        info->m_data.assign(bytes.constData(), static_cast<size_t>(bytes.size()));
-        info->m_fileName = QFileInfo(file).fileName().toStdString();
-      } else {
-        LOG_WARN("app handoff: can't read \"%s\"", qPrintable(captured.filePath));
-      }
+  if (dragged) {
+    cancelWindowDrag();
+    if (releaseButton) {
+      releaseLeftButton();
     }
+  }
 
-    if (info->m_appId.empty() && info->m_url.empty() && info->m_fileName.empty()) {
-      delete info;
-      return;
+  LOG_INFO("app handoff: sending \"%s\"", qPrintable(captured.displayName));
+  m_events->addEvent(Event(EventTypes::AppHandoffCaptured, m_eventTarget, info));
+
+  // it's only a move for a page: documents may have unsaved work, so they stay open
+  if (!captured.url.isEmpty()) {
+    if (dragged) {
+      // a browser ignores requests to close a tab until the drag has ended
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-
-    LOG_INFO("app handoff: sending \"%s\"", qPrintable(captured.displayName));
-    m_events->addEvent(Event(EventTypes::AppHandoffCaptured, m_eventTarget, info));
-
-    // it's only a move for a page: documents may have unsaved work, so they stay open
-    if (!captured.url.isEmpty()) {
-      closeCapturedTab(captured);
-    }
-  });
+    closeCapturedTab(captured);
+  }
 }
 
 void AppHandoffEngine::reset()

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "base/DirectionTypes.h"
+
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -22,6 +24,7 @@ class EdgePushDetector
 {
 public:
   using Callback = std::function<void()>;
+  using DragCallback = std::function<void(Direction)>;
 
   virtual ~EdgePushDetector() = default;
 
@@ -32,9 +35,17 @@ public:
    *        deskflow can't control, such as an elevation prompt; may not be supported everywhere.
    * \param onHandoff Called (from a worker thread) when ctrl+alt+super+H is pressed on this
    *        computer's own keyboard.
+   * \param dragEdges DirectionMask of the edges where pushing with the left button held counts.
+   * \param onDragPush Called (from a worker thread) with the edge pushed against.
    * \return nullptr if this platform can't watch the mouse.
+   *
+   * A push with the left button held is never a role swap. Pass 0 and empty callbacks for what
+   * isn't wanted: a server watches only for drags, and has hotkeys of its own.
    */
-  static std::unique_ptr<EdgePushDetector> create(uint32_t edges, Callback onPush, Callback onInputBlocked, Callback onHandoff);
+  static std::unique_ptr<EdgePushDetector> create(
+      uint32_t edges, Callback onPush, Callback onInputBlocked, Callback onHandoff, uint32_t dragEdges,
+      DragCallback onDragPush
+  );
 };
 
 } // namespace deskflow

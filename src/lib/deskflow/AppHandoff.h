@@ -92,6 +92,15 @@ CapturedApp captureFrontApp();
 //! Closes the browser tab that captureFrontApp() found.
 void closeCapturedTab(const CapturedApp &app);
 
+//! Whether the left button is holding a window by its title bar, or a browser tab.
+bool isWindowBeingDragged();
+
+//! Takes back a window drag, if the platform can: the window returns to where it started.
+void cancelWindowDrag();
+
+//! Lets go of the left button, for a drag made with this computer's own mouse.
+void releaseLeftButton();
+
 //! Starts \p app, opening \p target (an address or a file path) if it isn't empty.
 bool launchApp(const App &app, const QString &target);
 

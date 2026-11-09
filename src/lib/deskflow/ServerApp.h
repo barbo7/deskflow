@@ -12,6 +12,7 @@
 #include "arch/IArchMultithread.h"
 #include "deskflow/App.h"
 #include "net/NetworkAddress.h"
+#include "platform/EdgePushDetector.h"
 #include "server/Config.h"
 
 #include <memory>
@@ -108,6 +109,7 @@ private:
 
   bool m_suspended = false;
   Server *m_server = nullptr;
+  std::unique_ptr<deskflow::EdgePushDetector> m_dragDetector;
   ServerState m_serverState = ServerState::Uninitialized;
   deskflow::Computer *m_serverComputer = nullptr;
   PrimaryClient *m_primaryClient = nullptr;

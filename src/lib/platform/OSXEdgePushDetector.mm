@@ -53,6 +53,12 @@ public:
   OSXEdgePushDetector(const OSXEdgePushDetector &) = delete;
   OSXEdgePushDetector &operator=(const OSXEdgePushDetector &) = delete;
 
+  void setDragCallback(uint32_t dragEdges, DragCallback onDragPush)
+  {
+    m_dragAccumulator = EdgePushAccumulator(dragEdges, kPushThreshold);
+    m_onDragPush = std::move(onDragPush);
+  }
+
   void setHandoffCallback(Callback onHandoff)
   {
     m_onHandoff = std::move(onHandoff);
@@ -131,7 +137,8 @@ private:
 
     self->handleMove(
         CGEventGetLocation(event), static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaX)),
-        static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaY))
+        static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaY)),
+        type == kCGEventLeftMouseDragged
     );
     return event;
   }
@@ -149,8 +156,10 @@ private:
     }
 
     if (CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 4) { // H
-      LOG_INFO("handoff hotkey pressed");
-      m_onHandoff();
+      if (m_onHandoff) {
+        LOG_INFO("handoff hotkey pressed");
+        m_onHandoff();
+      }
       return;
     }
 
@@ -185,7 +194,7 @@ private:
     m_onPush();
   }
 
-  void handleMove(CGPoint location, double dx, double dy)
+  void handleMove(CGPoint location, double dx, double dy, bool leftButtonHeld)
   {
     // the desktop's outer edges, across all displays
     CGDirectDisplayID displays[16];
@@ -204,6 +213,14 @@ private:
     at.top = location.y <= CGRectGetMinY(desktop) + 1;
     at.bottom = location.y >= CGRectGetMaxY(desktop) - 1;
 
+    if (leftButtonHeld) {
+      if (m_onDragPush && m_dragAccumulator.feed(dx, dy, at, EdgePushAccumulator::Clock::now())) {
+        LOG_DEBUG("pushed against an edge with the left button held");
+        m_onDragPush(EdgePushAccumulator::pushDirection(dx, dy, at));
+      }
+      return;
+    }
+
     if (m_accumulator.feed(dx, dy, at, EdgePushAccumulator::Clock::now())) {
       LOG_INFO("mouse pushed toward the server, asking to swap roles");
       m_onPush();
@@ -214,6 +231,8 @@ private:
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
   EdgePushAccumulator::Clock::time_point m_lastHotKey;
+  EdgePushAccumulator m_dragAccumulator{0, kPushThreshold};
+  DragCallback m_onDragPush;
   Callback m_onHandoff;
   CFMachPortRef m_tap = nullptr;
   CFMachPortRef m_keyTap = nullptr;
@@ -223,13 +242,16 @@ private:
 
 } // namespace
 
-std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t edges, Callback onPush, Callback, Callback onHandoff)
+std::unique_ptr<EdgePushDetector> EdgePushDetector::create(
+    uint32_t edges, Callback onPush, Callback, Callback onHandoff, uint32_t dragEdges, DragCallback onDragPush
+)
 {
-  if (edges == 0) {
+  if (edges == 0 && dragEdges == 0) {
     return nullptr;
   }
   auto detector = std::make_unique<OSXEdgePushDetector>(edges, std::move(onPush));
   detector->setHandoffCallback(std::move(onHandoff));
+  detector->setDragCallback(dragEdges, std::move(onDragPush));
   if (!detector->start()) {
     return nullptr;
   }

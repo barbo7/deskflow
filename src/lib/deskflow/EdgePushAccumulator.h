@@ -13,6 +13,11 @@
 
 namespace deskflow {
 
+//! DirectionMask of every edge.
+inline constexpr uint32_t kAllEdgesMask =
+    static_cast<uint32_t>(DirectionMask::LeftMask) | static_cast<uint32_t>(DirectionMask::RightMask) |
+    static_cast<uint32_t>(DirectionMask::TopMask) | static_cast<uint32_t>(DirectionMask::BottomMask);
+
 /**
  * Decides when the user's own mouse has been pushed hard enough against an edge.
  *
@@ -42,6 +47,24 @@ public:
     bool top = false;
     bool bottom = false;
   };
+
+  //! The edge a movement is pushing into, if any.
+  static Direction pushDirection(double dx, double dy, const Edges &at)
+  {
+    if (at.left && dx < 0) {
+      return Direction::Left;
+    }
+    if (at.right && dx > 0) {
+      return Direction::Right;
+    }
+    if (at.top && dy < 0) {
+      return Direction::Top;
+    }
+    if (at.bottom && dy > 0) {
+      return Direction::Bottom;
+    }
+    return Direction::NoDirection;
+  }
 
   //! Returns true when this movement completes a push.
   bool feed(double dx, double dy, const Edges &at, Clock::time_point now)

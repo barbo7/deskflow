@@ -8,6 +8,9 @@
 
 #include "deskflow/ServerApp.h"
 
+#include "deskflow/ActiveComputer.h"
+#include "deskflow/EdgePushAccumulator.h"
+
 #include "arch/Arch.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
@@ -559,6 +562,24 @@ int ServerApp::mainLoop()
       }
   );
 
+  // a window dragged by its title bar and pushed against an edge moves to the computer there.
+  // the detector calls back from its own thread; hand over to the event thread
+  auto *events = getEvents();
+  m_dragDetector = deskflow::EdgePushDetector::create(
+      0, {}, [] {}, {}, deskflow::kAllEdgesMask,
+      [events](Direction direction) {
+        events->addEvent(
+            Event(EventTypes::AppDragPush, events->getSystemTarget(), new deskflow::DragPushInfo(direction))
+        );
+      }
+  );
+  getEvents()->addHandler(EventTypes::AppDragPush, getEvents()->getSystemTarget(), [this](const auto &e) {
+    const auto *info = dynamic_cast<const deskflow::DragPushInfo *>(e.getDataObject());
+    if (info != nullptr && m_server != nullptr) {
+      m_server->handleLocalDragPush(info->m_direction);
+    }
+  });
+
   // run event loop.  if startServer() failed we're supposed to retry
   // later.  the timer installed by startServer() will take care of
   // that.
@@ -568,6 +589,8 @@ int ServerApp::mainLoop()
   LOG_DEBUG("stopping server");
   getEvents()->removeHandler(EventTypes::ServerAppForceReconnect, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::ServerAppReloadConfig, getEvents()->getSystemTarget());
+  m_dragDetector.reset();
+  getEvents()->removeHandler(EventTypes::AppDragPush, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::AppSwitchToComputerRequest, getEvents()->getSystemTarget());
   cleanupServer();
   LOG_INFO("stopped server");

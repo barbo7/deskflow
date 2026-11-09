@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "base/DirectionTypes.h"
 #include "base/Event.h"
 
 #include <string>
@@ -24,6 +25,19 @@ inline std::string localPlatformName()
   return "linux";
 #endif
 }
+
+//! Event data for EventTypes::AppDragPush.
+class DragPushInfo : public EventData
+{
+public:
+  explicit DragPushInfo(Direction direction) : m_direction(direction)
+  {
+    // do nothing
+  }
+  ~DragPushInfo() override = default;
+
+  Direction m_direction;
+};
 
 //! Event data for EventTypes::AppSwitchToComputerRequest.
 class SwitchRequestInfo : public EventData

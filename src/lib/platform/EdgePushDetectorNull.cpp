@@ -8,7 +8,7 @@
 
 namespace deskflow {
 
-std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t, Callback, Callback, Callback)
+std::unique_ptr<EdgePushDetector> EdgePushDetector::create(uint32_t, Callback, Callback, Callback, uint32_t, DragCallback)
 {
   // not implemented on this platform yet
   return nullptr;

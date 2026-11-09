@@ -668,6 +668,11 @@ void Client::captureForHandoff(const std::string &target)
   m_handoff->capture(target);
 }
 
+void Client::captureDraggedWindow(const std::string &target, bool releaseButton)
+{
+  m_handoff->captureDraggedWindow(target, releaseButton);
+}
+
 void Client::handoffStart(const std::string &appId, const std::string &url, const std::string &fileName, uint32_t size)
 {
   m_handoff->begin(appId, url, fileName, size);

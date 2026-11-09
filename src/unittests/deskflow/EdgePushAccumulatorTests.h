@@ -16,4 +16,5 @@ private Q_SLOTS:
   void feed_awayFromEdge_resetsPush();
   void feed_pause_resetsPush();
   void feed_afterTrigger_staysQuiet();
+  void pushDirection_findsTheEdge();
 };

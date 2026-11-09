@@ -1284,6 +1284,22 @@ extern const char *const kMsgDMonitors;
 extern const char *const kMsgDHandoffRequest;
 
 /**
+ * @brief If a window is being dragged, send it to another computer
+ *
+ * **Message Code**: `"DHDR"`
+ * **Direction**: Primary → Secondary
+ * **Format**: `"DHDR%s"`
+ * **Parameters**:
+ * - `$1`: Name of the computer to send it to (string)
+ *
+ * The server's mouse is holding the left button down and pushing against the client's edge.
+ * The client answers with DHST only if that's really a window being dragged.
+ *
+ * @since Protocol version 1.10
+ */
+extern const char *const kMsgDHandoffDrag;
+
+/**
  * @brief An app is being moved
  *
  * **Message Code**: `"DHST"`
