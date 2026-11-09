@@ -1,3 +1,14 @@
+> [!IMPORTANT]
+> **This is an unofficial fork of [Deskflow](https://github.com/deskflow/deskflow), not affiliated with or supported by the Deskflow project.**
+> Please report problems with this fork here, not to the Deskflow team.
+>
+> **What it adds:** use the mouse and keyboard of *either* computer on both, without switching server and client by hand.
+> Push the client's own mouse against the edge that leads to the server (or press `Ctrl+Alt+Win+arrow` / `Control+Option+Command+arrow`) and the two computers swap roles in a few seconds, with clipboard sharing intact.
+> Also adds an "in use" indicator, "Switch to" buttons, an escape hotkey (`...+M`), a 45-second automatic revert if a swap fails, and protection against swaps while a game has the mouse.
+>
+> **Install:** download the [`roleswap-1` release](https://github.com/barbo7/deskflow/releases/tag/roleswap-1) on **both** computers. On Windows, set the process mode to **Desktop** (role swaps don't work in Service mode). Builds are unsigned.
+> **Tested on** one Mac and one Windows x64 PC only; this is experimental. Details (in Turkish): [how it works and how to set it up](https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/docs/AktifBilgisayar-ve-PatronDegisimi.md).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-dark-200px.png?raw=true">
   <source media="(prefers-color-scheme: light)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-light-200px.png?raw=true">

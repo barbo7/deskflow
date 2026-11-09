@@ -15,7 +15,7 @@ neler eklediğimizi, nasıl çalıştığını ve başka bilgisayarlara nasıl k
 
 ## 1. Neden yaptık?
 
-**İhtiyaç:** Mac (MacBook Air) ve Windows (Barbo) yan yana duruyor. İkisini de hangi bilgisayarın
+**İhtiyaç:** Bir Mac ve bir Windows bilgisayar yan yana duruyor. İkisini de hangi bilgisayarın
 başındaysak **o bilgisayarın faresi ve klavyesiyle** kullanmak istiyoruz. İş yaparken
 kopyala-yapıştır çalışmalı; oyun oynarken de fare yanlışlıkla öbür ekrana kaçmamalı.
 
@@ -38,7 +38,7 @@ o bilgisayar kendiliğinden patron oluyor.
 
 | Özellik | Ne yapar |
 |---|---|
-| **Aktif bilgisayar göstergesi** | Deskflow penceresinde "In use: Barbo (Windows)" satırı; tepsi/menü çubuğu simgesi elma 🍎 ya da dört kare ⊞ olur |
+| **Aktif bilgisayar göstergesi** | Deskflow penceresinde "In use: WindowsPC (Windows)" satırı; tepsi/menü çubuğu simgesi elma 🍎 ya da dört kare ⊞ olur |
 | **Switch to düğmeleri** | Pencereden ve tepsi menüsünden tek tıkla öbür bilgisayara geçiş. İmleç hedef ekranın **ortasına** gider |
 | **Ok tuşlu kısayollar** | `Ctrl+Alt+Win+←/→` (Windows), `Control+Option+Command+←/→` (Mac) |
 | **Otomatik patron değişimi** | Yardımcı bilgisayarın **kendi faresi** patrona bakan kenara itilince (ya da kendi klavyesinde kısayola basılınca) roller değişir, ~1-4 saniye sürer |
@@ -138,20 +138,63 @@ Eski Deskflow sürümleri 1.8'e düşer; bu mesajları hiç görmezler.
 
 ## 4. Başka bilgisayarlara kurulum
 
-### Windows
+Hazır kurulum dosyaları: **[Release roleswap-1](https://github.com/barbo7/deskflow/releases/tag/roleswap-1)**
 
-1. Bu dalın son GitHub Actions derlemesinden `package-deskflow-windows-2022-x64` dosyasını indir
-   (Actions sekmesi → son başarılı "Continuous Integration" → Artifacts). Ya da:
-   ```
-   gh run download <RUN_ID> -R barbo7/deskflow -n package-deskflow-windows-2022-x64
-   ```
-2. Çalışan Deskflow'u kapat, `.msi`'yi kur (imzasız: "Bilinmeyen yayıncı" uyarısı normal).
-3. **Ayarlarda süreç modunu Desktop yap** (Service değil; bkz. bilinen sorunlar).
-4. Client modunda Mac'in IP adresine bağlan.
+En kolay yol: aşağıdaki metni **iki bilgisayardaki Claude Code'a ayrı ayrı** yapıştırmak.
 
-> GitHub Actions dosyaları **90 gün** sonra silinir. Kalıcı olsun istersen bir GitHub Release oluştur.
+```text
+İki bilgisayar arasında tek fare ve klavye paylaşımı kuracağız. Deskflow'un gayriresmi "roleswap"
+sürümünü kullanacağız: hangi bilgisayarın faresi kenara itilirse o bilgisayar patron (server) olur.
+Bu metni iki bilgisayara da yapıştırıyorum; sen sadece bu bilgisayarla ilgilen.
 
-### Mac (kaynaktan derleme)
+Kaynaklar:
+- Release: https://github.com/barbo7/deskflow/releases/tag/roleswap-1
+- Belge: https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/docs/AktifBilgisayar-ve-PatronDegisimi.md
+
+Kurallar:
+- Her adımı kısa ve Türkçe anlat. Bir şey ters giderse tahmin yürütme, dur ve bana göster.
+- Yalnızca Deskflow'a dokun. Yönetici izni, Erişilebilirlik izni ve parmak izi onaylarını ben veririm.
+- Başlamadan önce bana sor: bu bilgisayar ilk kurulumda SERVER mı CLIENT mı olacak, öbür bilgisayar
+  bu bilgisayarın hangi tarafında duruyor?
+
+Adımlar:
+1. İşletim sistemini ve işlemci mimarisini bul. Release'ten uygun dosyayı ve sums.txt'yi indir:
+   Windows x64: deskflow-roleswap-1-win-x64.msi
+   Windows ARM: deskflow-roleswap-1-win-arm64.msi
+   Apple Silicon Mac: deskflow-roleswap-1-macos-arm64.dmg
+   Intel Mac: deskflow-roleswap-1-macos-x86_64.dmg
+2. Dosyanın SHA-256 özetini sums.txt ile karşılaştır. Uyuşmazsa dur.
+3. Çalışan Deskflow varsa kapat.
+4. Kur:
+   - Windows: msiexec /i ile kur. Dosya imzasız, "Bilinmeyen yayıncı" uyarısı normal.
+   - Mac: dmg'yi aç, uygulamayı /Applications/Deskflow Roleswap.app olarak kopyala, sonra sırayla:
+     * Info.plist içinde CFBundleIdentifier değerini org.deskflow.deskflow.roleswap yap
+       (resmi Deskflow ile izinleri karışmasın diye)
+     * xattr -dr com.apple.quarantine ile karantina işaretini kaldır
+     * codesign --force --deep -s - ile yerel olarak imzala ve codesign --verify --deep ile doğrula
+     Sonra Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik sayfasını aç;
+     ＋ ile uygulamayı eklememi ve anahtarını açmamı iste.
+5. Windows ise Deskflow ayarlarında süreç modunu Desktop yap (Service değil). Service modunda patron
+   değişimi çalışmıyor.
+6. Deskflow'u aç ve bu bilgisayarın adını ve IP adresini bana söyle.
+7. SERVER ise: Server modunu seç, Configure Server ekranında öbür bilgisayarı doğru tarafa, adını
+   birebir aynı yazarak yerleştir, Deskflow'u başlat.
+   CLIENT ise: Client modunu seç, server'ın IP adresini bana sor ve yaz, Deskflow'u başlat.
+8. İlk bağlantıda çıkan parmak izi pencerelerini onaylamamı iste. Bağlanınca bana haber ver.
+
+Deneme (iki bilgisayar da hazır olunca):
+- Server'ın faresiyle ekran kenarından öbür bilgisayara geç.
+- Client'ın kendi faresini server'a bakan kenara doğru it. 1-5 saniye içinde roller değişmeli ve
+  imleç öbür bilgisayara geçmeli.
+- Kısayol: Ctrl+Alt+Win+ok (Windows), Control+Option+Command+ok (Mac).
+- Acil dönüş: aynı tuşlar + M.
+- Değişim başarısız olursa 45 saniye içinde iki taraf eski rolüne döner. Deskflow penceresinin Log
+  panelindeki "role swap" satırlarını bana getir.
+```
+
+### Elle kurmak isteyenler
+
+Yukarıdaki adımların aynısını elle uygulayabilirsin. Mac'te kaynaktan derlemek için:
 
 ```bash
 brew install cmake ninja qt openssl@3 pkgconf
@@ -162,27 +205,16 @@ cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build build
 ```
 
-Sonra uygulamaya resmi Deskflow'dan **farklı bir kimlik** ver ve yerel olarak imzala; yoksa macOS
-Erişilebilirlik iznini resmi sürümle karıştırır:
+Kaynaktan derlenen uygulama Homebrew'deki Qt'ye bağlıdır; başka Mac'lere kopyalamak için Release'teki
+`.dmg` dosyasını kullan.
 
-```bash
-cp -R build/bin/Deskflow.app "/Applications/Deskflow Dev.app"
-P="/Applications/Deskflow Dev.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier org.deskflow.deskflow.dev" "$P"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName Deskflow Dev" "$P"
-codesign --force --deep -s - "/Applications/Deskflow Dev.app"
-```
-
-Ardından Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik → ＋ → **Deskflow Dev**.
-
-> Her yeni derlemede macOS izni yeniden ister. Uygulamayı **yeni bir adla** (ör. "Deskflow Dev 2")
-> kurmak, eski izin kayıtlarıyla karışmayı önler.
+> Mac'te her yeni sürüm için Erişilebilirlik izni yeniden gerekir. macOS aynı adlı uygulamayı
+> önbellekte tutabildiği için yeni sürümü **yeni bir adla** kurmak en sorunsuz yoldur.
 
 ### İki bilgisayarda da
 
-- İkisi de bu daldan derlenmiş olmalı (protokol 1.9). Biri eski sürümse gösterge ve geçiş
-  düğmeleri çalışır ama patron değişimi çalışmaz.
-- Bilgisayar adları her iki tarafta aynı olmalı (ör. `Barbo`, `BORA-MacBook-Air.local`).
+- İkisi de bu sürümde olmalı. Biri resmi Deskflow ise paylaşım çalışır, ama patron değişimi çalışmaz.
+- Bilgisayar adları her iki tarafta aynı olmalı (ör. `WindowsPC`, `MacBook.local`).
 
 ---
 
@@ -193,7 +225,7 @@ Ardından Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik → �
 | **Windows Service modu** | Bu modda pencere, "durdur/başlat" komutunu servise iletemiyor; patron değişimi yarım kalıp 45 sn sonra geri dönüyor. **Desktop modu kullan.** Sebebi henüz kesin bulunamadı |
 | Desktop modunun eksiği | Mac patronken, Windows'ta yönetici olarak çalışan pencereler (Görev Yöneticisi gibi) Mac faresiyle kontrol edilemez |
 | İlk değişimde parmak izi | Bilgisayarlar birbirine hiç güvenmemişse ilk değişimde onay penceresi çıkabilir |
-| Sadece 2 bilgisayarla denendi | Daha fazla bilgisayarlı yerleşimler test edilmedi |
+| Test kapsamı | Bir Mac ile bir Windows x64 bilgisayarda denendi. Üç veya daha fazla bilgisayar, Windows ARM ve Release'teki Mac `.dmg` dosyaları denenmedi |
 | Linux | Kenar itme algılayıcısı yok; gösterge ve düğmeler çalışır |
 | Mac menü çubuğu simgesi | Kamera çentikli Mac'lerde kalabalık menü çubuğunda gizlenebilir; pencere üzerindeki satır her zaman görünür |
 | Resmi güncellemeler | Resmi Deskflow güncellenince bu değişikliklerin yeni sürüme taşınması gerekir |
