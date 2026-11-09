@@ -143,6 +143,52 @@ void CoreProcess::daemonIpcClientConnected()
   m_daemonIpcClient->requestLogPath();
 }
 
+void CoreProcess::connectCoreIpc()
+{
+  if (m_processState != ProcessState::Started) {
+    return;
+  }
+
+  if (m_coreIpcClient) {
+    m_coreIpcClient->disconnectFromServer();
+    m_coreIpcClient->deleteLater();
+    m_coreIpcClient = nullptr;
+  }
+
+  m_coreIpcClient = new ipc::CoreIpcClient(this);
+
+  // keep trying while the core runs: in service mode the daemon may start it (or restart it)
+  // well after we asked, and without this connection the gui never hears from the core
+  auto retryLater = [this, client = m_coreIpcClient] {
+    client->deleteLater();
+    if (m_coreIpcClient != client)
+      return;
+    m_coreIpcClient = nullptr;
+    QTimer::singleShot(kCoreIpcRetryDelay, this, &CoreProcess::connectCoreIpc);
+  };
+
+  // queued so a modal dialog opened by a handler can't block readyRead and strand later messages
+  connect(
+      m_coreIpcClient, &ipc::CoreIpcClient::commandReceived, this, &CoreProcess::onCoreIpcMessageReceived,
+      Qt::QueuedConnection
+  );
+  connect(m_coreIpcClient, &ipc::CoreIpcClient::connected, this, [this] {
+    qDebug("connected to core ipc server");
+    if (m_coreIpcClient)
+      m_coreIpcClient->requestActiveComputer();
+  });
+  connect(m_coreIpcClient, &ipc::CoreIpcClient::connectionFailed, this, [retryLater] {
+    qWarning("failed to establish core ipc connection, retrying");
+    retryLater();
+  });
+  connect(m_coreIpcClient, &ipc::CoreIpcClient::serverShutdown, this, [retryLater] {
+    qDebug("core ipc server shut down");
+    retryLater();
+  });
+
+  m_coreIpcClient->connectToServer();
+}
+
 void CoreProcess::checkExistingProcess()
 {
   qInfo("checking existing core");
@@ -452,41 +498,7 @@ void CoreProcess::start(std::optional<ProcessMode> processModeOption)
         }
 
         // Delay briefly to give the core process time to start its IPC server.
-        QTimer::singleShot(kRetryDelay, this, [this] {
-          if (m_processState != ProcessState::Started) {
-            return;
-          }
-
-          if (m_coreIpcClient) {
-            m_coreIpcClient->disconnectFromServer();
-            m_coreIpcClient->deleteLater();
-            m_coreIpcClient = nullptr;
-          }
-
-          m_coreIpcClient = new ipc::CoreIpcClient(this);
-
-          // queued so a modal dialog opened by a handler can't block readyRead and strand later messages
-          connect(
-              m_coreIpcClient, &ipc::CoreIpcClient::commandReceived, this, &CoreProcess::onCoreIpcMessageReceived,
-              Qt::QueuedConnection
-          );
-          connect(m_coreIpcClient, &ipc::CoreIpcClient::connected, this, [this] {
-            qDebug("connected to core ipc server");
-            if (m_coreIpcClient)
-              m_coreIpcClient->requestActiveComputer();
-          });
-          connect(m_coreIpcClient, &ipc::CoreIpcClient::connectionFailed, this, [] {
-            qWarning("failed to establish core ipc connection");
-          });
-          connect(m_coreIpcClient, &ipc::CoreIpcClient::serverShutdown, this, [this, client = m_coreIpcClient] {
-            qDebug("core ipc server shut down cleanly");
-            client->deleteLater();
-            if (m_coreIpcClient == client)
-              m_coreIpcClient = nullptr;
-          });
-
-          m_coreIpcClient->connectToServer();
-        });
+        QTimer::singleShot(kRetryDelay, this, &CoreProcess::connectCoreIpc);
       },
       static_cast<Qt::ConnectionType>(Qt::SingleShotConnection | Qt::QueuedConnection)
   );

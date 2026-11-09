@@ -828,6 +828,15 @@ void MainWindow::handleRoleSwap(const QString &role, const QString &data)
       Settings::setValue(Settings::Server::ExternalConfigFile, path);
       qInfo().noquote() << "role swap: using the old server's layout from" << path;
     }
+    // the core takes the list of computers from the settings, not the layout file: a computer
+    // that was only ever a client has none, so add every connected computer
+    for (const auto &entry : std::as_const(m_computers)) {
+      const auto name = entry.section('|', 0, 0);
+      if (!name.isEmpty() && Settings::value(Settings::Computer::Name.arg(name)).toString().isEmpty()) {
+        Settings::setValue(Settings::Computer::Name.arg(name), name);
+        qInfo().noquote() << "role swap: added computer" << name;
+      }
+    }
     ui->rbModeServer->setChecked(true);
   } else {
     qWarning().noquote() << "role swap: unknown role" << role;

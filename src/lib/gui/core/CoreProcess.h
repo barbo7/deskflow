@@ -130,6 +130,7 @@ private:
   QString correctedAddress(const QString &address) const;
   void setupDaemonLogTail(const QString &logPath);
   void checkExistingProcess();
+  void connectCoreIpc();
   static QString makeQuotedArgs(const QString &app, const QStringList &args);
   static QString processModeToString(const Settings::ProcessMode mode);
   static QString processStateToString(const CoreProcess::ProcessState state);
@@ -144,6 +145,7 @@ private:
   QString m_secureSocketVersion;
   std::optional<ProcessMode> m_lastProcessMode = std::nullopt;
   QTimer m_retryTimer;
+  static constexpr int kCoreIpcRetryDelay = 2000; // ms
   deskflow::gui::ipc::CoreIpcClient *m_coreIpcClient = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;
   FileTail *m_daemonFileTail = nullptr;

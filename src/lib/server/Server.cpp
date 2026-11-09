@@ -407,9 +407,20 @@ void Server::sendSwapInfo(BaseClientProxy *client) const
     }
   }
 
-  std::ostringstream config;
-  config << *m_config;
-  client->sendSwapInfo(edges, config.str());
+  std::ostringstream text;
+  text << *m_config;
+
+  // drop the listen address: it's this computer's, and would be wrong on the new server
+  std::istringstream lines(text.str());
+  std::string config;
+  for (std::string line; std::getline(lines, line);) {
+    if (const auto start = line.find_first_not_of(" \t");
+        start != std::string::npos && line.compare(start, 7, "address") == 0) {
+      continue;
+    }
+    config += line + "\n";
+  }
+  client->sendSwapInfo(edges, config);
 }
 
 void Server::handleRoleSwapRequest(BaseClientProxy *client, const std::string &hosts)
