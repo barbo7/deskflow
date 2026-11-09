@@ -16,6 +16,7 @@
 #include "client/ServerProxy1_8.h"
 #include "client/ServerProxy1_9.h"
 #include "client/ServerProxy1_10.h"
+#include "client/ServerProxy1_11.h"
 #include "deskflow/AppHandoff.h"
 #include "deskflow/AppHandoffEngine.h"
 #include "common/NetworkProtocol.h"
@@ -77,12 +78,14 @@ Client::Client(
 
   m_handoff = std::make_unique<deskflow::AppHandoffEngine>(m_events, this);
   m_events->addHandler(EventTypes::AppHandoffCaptured, this, [this](const auto &e) { handleHandoffCaptured(e); });
+  m_events->addHandler(EventTypes::AppHandoffOpened, this, [this](const auto &e) { handleHandoffOpened(e); });
 }
 
 Client::~Client()
 {
   m_handoff.reset();
   m_events->removeHandler(EventTypes::AppHandoffCaptured, this);
+  m_events->removeHandler(EventTypes::AppHandoffOpened, this);
   m_events->removeHandler(EventTypes::ComputerSuspend, getEventTarget());
   m_events->removeHandler(EventTypes::ComputerResume, getEventTarget());
 
@@ -499,6 +502,9 @@ bool Client::setupComputer(int16_t protocolMinor)
   case 10:
     m_server = new ServerProxy1_10(this, m_stream, m_events);
     break;
+  case 11:
+    m_server = new ServerProxy1_11(this, m_stream, m_events);
+    break;
   default:
     break;
   }
@@ -681,6 +687,19 @@ void Client::handoffStart(const std::string &appId, const std::string &url, cons
 void Client::handoffData(const std::string &chunk)
 {
   m_handoff->data(chunk);
+}
+
+void Client::handoffDelivered(bool opened)
+{
+  m_handoff->delivered(opened);
+}
+
+void Client::handleHandoffOpened(const Event &event)
+{
+  const auto *result = dynamic_cast<const deskflow::HandoffResult *>(event.getDataObject());
+  if (result != nullptr && m_server != nullptr) {
+    m_server->sendHandoffAck(result->m_opened);
+  }
 }
 
 void Client::handleHandoffCaptured(const Event &event)

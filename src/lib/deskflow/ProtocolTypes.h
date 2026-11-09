@@ -45,7 +45,7 @@ static const int16_t kProtocolMajorVersion = 1;
  * @note When incrementing the minor version, the Deskflow application version should also increment
  * @since Protocol version 1.0
  */
-static const int16_t kProtocolMinorVersion = 10;
+static const int16_t kProtocolMinorVersion = 11;
 
 /**
  * @brief Default TCP port for Deskflow connections
@@ -1315,6 +1315,21 @@ extern const char *const kMsgDHandoffDrag;
  * @since Protocol version 1.10
  */
 extern const char *const kMsgDHandoffStart;
+
+/**
+ * @brief The app that was being moved has been opened, or couldn't be
+ *
+ * **Message Code**: `"DHAK"`
+ * **Direction**: Both
+ * **Format**: `"DHAK%1i"`
+ * **Parameters**:
+ * - `$1`: 1 if it opened, 0 if not (1-byte integer)
+ *
+ * Only when it has opened does the computer it came from close it.
+ *
+ * @since Protocol version 1.11
+ */
+extern const char *const kMsgDHandoffAck;
 
 /**
  * @brief A piece of the file announced by DHST

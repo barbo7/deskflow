@@ -107,6 +107,7 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   });
   m_handoff = std::make_unique<deskflow::AppHandoffEngine>(m_events, this);
   m_events->addHandler(EventTypes::AppHandoffCaptured, this, [this](const auto &e) { handleHandoffCaptured(e); });
+  m_events->addHandler(EventTypes::AppHandoffOpened, this, [this](const auto &e) { handleHandoffOpened(e); });
   m_events->addHandler(EventTypes::ServerHandoffApp, m_inputFilter, [this](const auto &) { startHandoffFromActive(); });
   m_events->addHandler(EventTypes::ServerSwitchInDirection, m_inputFilter, [this](const auto &e) {
     handleSwitchInDirectionEvent(e);
@@ -181,6 +182,7 @@ Server::~Server()
 
   m_handoff.reset();
   m_events->removeHandler(EventTypes::AppHandoffCaptured, this);
+  m_events->removeHandler(EventTypes::AppHandoffOpened, this);
   m_events->removeHandler(EventTypes::ServerHandoffApp, m_inputFilter);
 
   try {
@@ -536,6 +538,7 @@ void Server::feedRemoteDragPush(int32_t dx, int32_t dy, int32_t ax, int32_t ay, 
   }
 
   const auto target = dragTarget(deskflow::EdgePushAccumulator::pushDirection(dx, dy, at));
+  LOG_INFO("app handoff: left button pushed against an edge of \"%s\", target \"%s\"", getName(m_active).c_str(), target.c_str());
   if (!target.empty()) {
     m_active->requestHandoffDrag(target);
   }
@@ -618,6 +621,32 @@ void Server::handleHandoffStart(
 
   // the cursor goes with the app
   switchToComputerByName(name);
+}
+
+void Server::handleHandoffOpened(const Event &event)
+{
+  if (const auto *result = dynamic_cast<const deskflow::HandoffResult *>(event.getDataObject()); result != nullptr) {
+    handleHandoffAck(m_primaryClient, result->m_opened);
+  }
+}
+
+void Server::handleHandoffAck(const BaseClientProxy *from, bool opened)
+{
+  // find who was moving something to this computer
+  const auto name = getName(from);
+  for (auto route = m_handoffRoutes.begin(); route != m_handoffRoutes.end(); ++route) {
+    if (route->second != name) {
+      continue;
+    }
+    const auto *source = route->first;
+    m_handoffRoutes.erase(route);
+    if (source == m_primaryClient) {
+      m_handoff->delivered(opened);
+    } else if (m_clientSet.contains(const_cast<BaseClientProxy *>(source))) {
+      const_cast<BaseClientProxy *>(source)->sendHandoffAck(opened);
+    }
+    return;
+  }
 }
 
 void Server::handleHandoffData(BaseClientProxy *source, const std::string &chunk)

@@ -15,8 +15,6 @@
 #include <QFile>
 #include <QFileInfo>
 
-#include <chrono>
-#include <thread>
 #include <utility>
 
 namespace deskflow {
@@ -51,6 +49,10 @@ AppHandoffEngine::~AppHandoffEngine()
   }
   m_wake.notify_all();
   m_thread.join();
+
+  if (m_sent.has_value()) {
+    forgetCapturedApp(*m_sent);
+  }
 }
 
 void AppHandoffEngine::post(std::function<void()> job)
@@ -93,7 +95,7 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
 {
   // a button held at the edge is usually something else, like selecting text
   if (dragged && !isWindowBeingDragged()) {
-    LOG_DEBUG("app handoff: pushed against an edge, but no window is being dragged");
+    LOG_INFO("app handoff: pushed against an edge, but no window is being dragged");
     return;
   }
 
@@ -102,6 +104,7 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
     const auto name = captured.displayName.isEmpty() ? QStringLiteral("This app") : captured.displayName;
     LOG_INFO("app handoff: nothing to send from \"%s\"", qPrintable(name));
     tellUser(QStringLiteral("%1 can't be moved: it isn't available on the other computer").arg(name));
+    forgetCapturedApp(captured);
     return;
   }
 
@@ -126,8 +129,17 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
 
   if (info->m_appId.empty() && info->m_url.empty() && info->m_fileName.empty()) {
     delete info;
+    forgetCapturedApp(captured);
     return;
   }
+
+  // close it afterwards only if what's in it really went along
+  const bool sentAll = !info->m_url.empty() || !info->m_fileName.empty() || hasNoDocuments(captured.appId);
+  if (m_sent.has_value()) {
+    forgetCapturedApp(*m_sent);
+  }
+  m_sent = captured;
+  m_sentAll = sentAll;
 
   if (dragged) {
     cancelWindowDrag();
@@ -138,15 +150,29 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
 
   LOG_INFO("app handoff: sending \"%s\"", qPrintable(captured.displayName));
   m_events->addEvent(Event(EventTypes::AppHandoffCaptured, m_eventTarget, info));
+}
 
-  // it's only a move for a page: documents may have unsaved work, so they stay open
-  if (!captured.url.isEmpty()) {
-    if (dragged) {
-      // a browser ignores requests to close a tab until the drag has ended
-      std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
-    closeCapturedTab(captured);
+void AppHandoffEngine::delivered(bool opened)
+{
+  post([this, opened] { finishPending(opened); });
+}
+
+void AppHandoffEngine::finishPending(bool opened)
+{
+  if (!m_sent.has_value()) {
+    return;
   }
+  const auto sent = *m_sent;
+  m_sent.reset();
+
+  if (!opened) {
+    tellUser(QStringLiteral("%1 couldn't be opened on the other computer, it stays here").arg(sent.displayName));
+  } else if (!m_sentAll) {
+    tellUser(QStringLiteral("%1 opened, but its page or document couldn't be sent, so it stays here").arg(sent.displayName));
+  } else {
+    closeCapturedApp(sent);
+  }
+  forgetCapturedApp(sent);
 }
 
 void AppHandoffEngine::reset()
@@ -171,7 +197,7 @@ void AppHandoffEngine::begin(
   }
 
   if (size == 0) {
-    post([appId, url, fileName] { open(appId, url, fileName, {}); });
+    post([this, appId, url, fileName] { openAndReport(appId, url, fileName, {}); });
     return;
   }
 
@@ -197,14 +223,23 @@ void AppHandoffEngine::data(const std::string &chunk)
 
   m_buffer += chunk;
   if (m_buffer.size() == m_expected) {
-    post([appId = m_appId, url = m_url, fileName = m_fileName, contents = std::move(m_buffer)] {
-      open(appId, url, fileName, contents);
+    post([this, appId = m_appId, url = m_url, fileName = m_fileName, contents = std::move(m_buffer)] {
+      openAndReport(appId, url, fileName, contents);
     });
     reset();
   }
 }
 
-void AppHandoffEngine::open(
+void AppHandoffEngine::openAndReport(
+    const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data
+)
+{
+  m_events->addEvent(
+      Event(EventTypes::AppHandoffOpened, m_eventTarget, new HandoffResult(open(appId, url, fileName, data)))
+  );
+}
+
+bool AppHandoffEngine::open(
     const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data
 )
 {
@@ -224,27 +259,27 @@ void AppHandoffEngine::open(
     if (name.isEmpty() || (app == nullptr && !defaultAppAllowed)) {
       LOG_WARN("app handoff: refusing file \"%s\"", fileName.c_str());
       tellUser(QStringLiteral("Refused a file that isn't a document"));
-      return;
+      return false;
     }
 
     const auto folder = receiveFolder();
     if (!QDir().mkpath(folder)) {
       LOG_ERR("app handoff: can't create \"%s\"", qPrintable(folder));
-      return;
+      return false;
     }
     target = uniqueFilePath(folder, name);
     QFile file(target);
     if (!file.open(QIODevice::WriteOnly) || file.write(data.data(), static_cast<qint64>(data.size())) != static_cast<qint64>(data.size())) {
       LOG_ERR("app handoff: can't write \"%s\"", qPrintable(target));
       tellUser(QStringLiteral("Couldn't save the received file"));
-      return;
+      return false;
     }
     file.close();
   }
 
   if (app == nullptr && target.isEmpty()) {
     LOG_WARN("app handoff: don't know what to do with app \"%s\"", appId.c_str());
-    return;
+    return false;
   }
 
   bool opened = app != nullptr && launchApp(*app, target);
@@ -260,6 +295,7 @@ void AppHandoffEngine::open(
     LOG_WARN("app handoff: couldn't open \"%s\"", qPrintable(label));
     tellUser(QStringLiteral("%1 isn't installed on this computer").arg(label));
   }
+  return opened;
 }
 
 } // namespace deskflow

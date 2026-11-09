@@ -259,7 +259,7 @@ private:
       const auto pushX = static_cast<double>(mouse.lLastX);
       const auto pushY = static_cast<double>(mouse.lLastY);
       if (m_onDragPush && m_dragAccumulator.feed(pushX, pushY, edge, EdgePushAccumulator::Clock::now())) {
-        LOG_DEBUG("pushed against an edge with the left button held");
+        LOG_INFO("pushed against an edge with the left button held");
         m_onDragPush(EdgePushAccumulator::pushDirection(pushX, pushY, edge));
       }
       return;

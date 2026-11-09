@@ -241,7 +241,7 @@ Kaynaktan derlenen uygulama Homebrew'deki Qt'ye bağlıdır; başka Mac'lere kop
 
 ---
 
-## 7. Monitör düzeni ve uygulama taşıma (protokol 1.10)
+## 7. Monitör düzeni ve uygulama taşıma (protokol 1.11)
 
 ### Monitör düzeni
 
@@ -261,8 +261,8 @@ kutusu işaretlenince bilgisayarlar sürüklenebilir, yaklaştıkları kenara ya
 
 **Fareyle:** pencereyi başlığından (tarayıcıda sekmesinden) tut, öbür bilgisayara bakan kenara götür ve
 tuşu bırakmadan **kenara doğru itmeye devam et**. Uygulama karşıda açılır, imleç de oraya geçer. Kenara
-sadece değmek yetmez, böylece Windows'un yarım ekran yerleştirmesi bozulmaz. Windows'ta sürüklenen pencere
-başladığı yere döner; Mac'te bırakıldığı yerde kalır.
+sadece değmek yetmez, böylece Windows'un yarım ekran yerleştirmesi bozulmaz. Kaynak pencere, karşı taraf açtıktan sonra
+kapanır.
 
 Metin seçerken ya da dosya sürüklerken kenara itmek bir şey yapmaz: yalnızca başlık çubuğundan tutulan
 pencere ve tarayıcı sekmesi sayılır. Mac pencerenin sürüklendiğini söyleyemediği için orada imlecin
@@ -281,12 +281,16 @@ aynı uygulama açılır.
 | Ne | Ne olur |
 |---|---|
 | Chrome, Edge, Brave, Safari | Sayfa karşıda açılır, sekme kaynakta kapanır (`Ctrl+Shift+T` ile geri gelir) |
-| Word, Excel, PowerPoint, Acrobat, VS Code, Cursor, Sublime... | Belgenin **diske kayıtlı hali** kopyalanır (`İndirilenler/Deskflow Handoff`), karşıda açılır. Kaynaktaki pencere açık kalır |
-| Spotify, Slack, Discord, Teams, Zoom, Notion, Figma... | Uygulama karşıda açılır; içeriği kendi hesabından gelir |
+| Word, Excel, PowerPoint, Acrobat | Belgenin **diske kayıtlı hali** kopyalanır (`İndirilenler/Deskflow Handoff`), karşıda açılır, kaynaktaki pencere kapanır |
+| VS Code, Cursor, Sublime | Aynısı, ama kaynakta yalnızca o sekme kapanır |
+| Spotify, Slack, Discord, Teams, Zoom, Notion, Figma... | Uygulama karşıda açılır, kaynaktaki penceresi kapanır; içeriği kendi hesabından gelir |
 | Listede olmayan uygulama | Belgesi varsa ve düz bir belgeyse varsayılan uygulamayla açılır, yoksa taşınmaz |
 
 Sınırlar:
 
+- Kaynak, ancak karşı taraf "açtım" dedikten sonra kapanır. Karşıda açılamazsa ya da sayfa/belge
+  gönderilemediyse kaynakta kalır.
+- Kapatma, pencerenin kendi kapatma düğmesiyle aynıdır: kaydedilmemiş iş varsa uygulama sorar.
 - Kaydedilmemiş değişiklikler ve açık sekme durumu taşınmaz.
 - En fazla 32 MB'lık dosya gider; daha büyüğünde yalnızca uygulama açılır.
 - Firefox'un Mac'te betik arayüzü yok: Mac'ten gönderilirken sayfa gitmez, yalnızca Firefox açılır.
@@ -306,8 +310,10 @@ türleri kabul edilir; dosya adları temizlenir.
 | `DHDR` | Patron → yardımcı | "Sürüklenen bir pencere varsa şuna gönder" |
 | `DHST` | İki yönlü | Hedef, uygulama, adres, dosya adı, boyut |
 | `DHDT` | İki yönlü | Dosyanın bir parçası (512 KB) |
+| `DHAK` | İki yönlü (1.11) | Karşı taraf açabildi mi |
 
-Eski sürümler 1.9'a düşer ve bu özellikleri görmez; taşıma için iki bilgisayar da bu sürümde olmalı.
+Eski sürümler uygun protokole düşer ve bu özellikleri görmez. Karşı taraf 1.10 ise taşıma çalışır ama
+"açtım" onayı gelmediği için kaynak kapanmaz. Her şey için iki bilgisayar da bu sürümde olmalı.
 
 ---
 

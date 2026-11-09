@@ -181,6 +181,10 @@ enum class EventTypes : uint32_t
   /// The app in front has been looked at and is ready to send. The data is a HandoffCapture.
   AppHandoffCaptured,
 
+  /// An app that arrived from another computer has been opened, or couldn't be.
+  /// The data is a HandoffResult.
+  AppHandoffOpened,
+
   /// Sent to a client's event target when the server sent role swap information. No data.
   ClientSwapInfoReceived,
 

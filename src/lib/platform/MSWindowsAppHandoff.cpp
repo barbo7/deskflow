@@ -204,10 +204,16 @@ CapturedApp captureFrontApp()
   return captured;
 }
 
-void closeCapturedTab(const CapturedApp &app)
+void forgetCapturedApp(const CapturedApp &)
 {
-  const auto *known = findAppById(app.appId);
-  if (known == nullptr || !known->isBrowser) {
+  // a window handle needs no releasing
+}
+
+void closeCapturedApp(const CapturedApp &app)
+{
+  if (!closesWithTabKey(app.appId)) {
+    // what the close button sends, so an app with unsaved work can ask about it
+    PostMessageW(reinterpret_cast<HWND>(app.window), WM_CLOSE, 0, 0);
     return;
   }
 

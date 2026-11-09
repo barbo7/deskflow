@@ -17,6 +17,7 @@
  * other computer, with the same web page or a copy of the same document.
  *
  * A running program can't move between operating systems, so what moves is the page or file.
+ * Once the other computer has opened it, it's closed here; if that fails it stays where it was.
  *
  * Everything a peer sends is treated as untrusted: it can only name an app from knownApps(),
  * never a program to run, and only http(s) addresses and plain document files are accepted.
@@ -49,6 +50,12 @@ const std::vector<App> &knownApps();
 const App *findAppById(const QString &id);
 const App *findAppByMacBundle(const QString &bundleId);
 const App *findAppByWindowsExe(const QString &exeFileName);
+
+//! Whether closing one thing in this app means closing a tab rather than its window.
+bool closesWithTabKey(const QString &appId);
+
+//! Whether this app has no document of its own to carry over, like a chat or music app.
+bool hasNoDocuments(const QString &appId);
 
 //! Only http(s) addresses, with nothing a command line or shell could misread.
 bool isAllowedUrl(const QString &url);
@@ -89,8 +96,14 @@ struct CapturedApp
 //! Finds the app in front and the page or document it's showing.
 CapturedApp captureFrontApp();
 
-//! Closes the browser tab that captureFrontApp() found.
-void closeCapturedTab(const CapturedApp &app);
+/**
+ * Closes what captureFrontApp() found: the tab in a browser or code editor, otherwise the window.
+ * It asks the way the close button does, so an app with unsaved work still gets to say so.
+ */
+void closeCapturedApp(const CapturedApp &app);
+
+//! Lets go of the platform handle in \p app. Call once for everything captureFrontApp() returned.
+void forgetCapturedApp(const CapturedApp &app);
 
 //! Whether the left button is holding a window by its title bar, or a browser tab.
 bool isWindowBeingDragged();

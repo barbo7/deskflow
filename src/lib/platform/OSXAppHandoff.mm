@@ -134,68 +134,85 @@ CapturedApp captureFrontApp()
       }
     }
 
+    // kept until the other computer has answered, so the right window gets closed
+    CFTypeRef window = nullptr;
+    if (AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute, &window) == kAXErrorSuccess && window != nullptr) {
+      captured.window = reinterpret_cast<quintptr>(window);
+    }
+
     CFRelease(focused);
   }
 
   return captured;
 }
 
-void closeCapturedTab(const CapturedApp &app)
+void closeCapturedApp(const CapturedApp &app)
 {
   const auto *known = findAppById(app.appId);
-  if (known == nullptr || !known->isBrowser || known->macBundleIds.isEmpty()) {
+  if (known != nullptr && known->isBrowser && !known->macBundleIds.isEmpty()) {
+    const auto &bundleId = known->macBundleIds.first();
+    if (isChromiumBundle(bundleId)) {
+      runAppleScript(QStringLiteral("tell application id \"%1\" to close active tab of front window").arg(bundleId));
+      return;
+    }
+    if (bundleId == QStringLiteral("com.apple.Safari")) {
+      runAppleScript(QStringLiteral("tell application id \"%1\" to close current tab of front window").arg(bundleId));
+      return;
+    }
+  }
+
+  auto window = reinterpret_cast<AXUIElementRef>(app.window);
+  if (window == nullptr) {
     return;
   }
 
-  const auto &bundleId = known->macBundleIds.first();
-  if (isChromiumBundle(bundleId)) {
-    runAppleScript(QStringLiteral("tell application id \"%1\" to close active tab of front window").arg(bundleId));
-  } else if (bundleId == QStringLiteral("com.apple.Safari")) {
-    runAppleScript(QStringLiteral("tell application id \"%1\" to close current tab of front window").arg(bundleId));
+  if (closesWithTabKey(app.appId)) {
+    // command+W only goes to the app in front: never close a tab somewhere else
+    pid_t captured = 0;
+    AXUIElementGetPid(window, &captured);
+    AXUIElementRef systemWide = AXUIElementCreateSystemWide();
+    CFTypeRef focused = nullptr;
+    AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, &focused);
+    CFRelease(systemWide);
+    pid_t front = 0;
+    if (focused != nullptr) {
+      AXUIElementGetPid(static_cast<AXUIElementRef>(focused), &front);
+      CFRelease(focused);
+    }
+    if (front != captured) {
+      LOG_DEBUG("app handoff: the app lost focus, leaving its tab open");
+      return;
+    }
+
+    const CGKeyCode kKeyW = 13;
+    for (const bool down : {true, false}) {
+      CGEventRef key = CGEventCreateKeyboardEvent(nullptr, kKeyW, down);
+      CGEventSetFlags(key, kCGEventFlagMaskCommand);
+      CGEventPost(kCGHIDEventTap, key);
+      CFRelease(key);
+    }
+    return;
+  }
+
+  // the window's own close button, so an app with unsaved work can ask about it
+  CFTypeRef button = nullptr;
+  if (AXUIElementCopyAttributeValue(window, kAXCloseButtonAttribute, &button) == kAXErrorSuccess && button != nullptr) {
+    AXUIElementPerformAction(static_cast<AXUIElementRef>(button), kAXPressAction);
+    CFRelease(button);
+  }
+}
+
+void forgetCapturedApp(const CapturedApp &app)
+{
+  if (app.window != 0) {
+    CFRelease(reinterpret_cast<CFTypeRef>(app.window));
   }
 }
 
 bool isWindowBeingDragged()
 {
   if (!CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft)) {
-    return false;
-  }
-
-  AXUIElementRef systemWide = AXUIElementCreateSystemWide();
-  CFTypeRef app = nullptr;
-  const auto error = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute, &app);
-  CFRelease(systemWide);
-  if (error != kAXErrorSuccess || app == nullptr) {
-    return false;
-  }
-
-  CFTypeRef window = nullptr;
-  AXUIElementCopyAttributeValue(static_cast<AXUIElementRef>(app), kAXFocusedWindowAttribute, &window);
-  CFRelease(app);
-  if (window == nullptr) {
-    return false;
-  }
-
-  CFTypeRef positionValue = nullptr;
-  CFTypeRef sizeValue = nullptr;
-  AXUIElementCopyAttributeValue(static_cast<AXUIElementRef>(window), kAXPositionAttribute, &positionValue);
-  AXUIElementCopyAttributeValue(static_cast<AXUIElementRef>(window), kAXSizeAttribute, &sizeValue);
-  CFRelease(window);
-
-  CGPoint position = CGPointZero;
-  CGSize size = CGSizeZero;
-  bool known = false;
-  if (positionValue != nullptr && sizeValue != nullptr) {
-    known = AXValueGetValue(static_cast<AXValueRef>(positionValue), kAXValueTypeCGPoint, &position) &&
-            AXValueGetValue(static_cast<AXValueRef>(sizeValue), kAXValueTypeCGSize, &size);
-  }
-  if (positionValue != nullptr) {
-    CFRelease(positionValue);
-  }
-  if (sizeValue != nullptr) {
-    CFRelease(sizeValue);
-  }
-  if (!known) {
+    LOG_INFO("app handoff: pushed against an edge, but the left button isn't down");
     return false;
   }
 
@@ -203,11 +220,47 @@ bool isWindowBeingDragged()
   const CGPoint cursor = CGEventGetLocation(now);
   CFRelease(now);
 
+  // not the accessibility api: the window server moves a dragged window by itself, and the app
+  // only hears where it ended up once the drag is over
+  CFArrayRef windows = CGWindowListCopyWindowInfo(
+      kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID
+  );
+  if (windows == nullptr) {
+    return false;
+  }
+
   // macOS can't say a window is being dragged, but a window follows the cursor by the strip
   // along its top: its title bar, or the tabs of a browser
   const double kTitleStrip = 56.0;
-  return cursor.x >= position.x - 2 && cursor.x <= position.x + size.width + 2 && cursor.y >= position.y - 2 &&
-         cursor.y <= position.y + kTitleStrip;
+  bool dragged = false;
+  const CFIndex count = CFArrayGetCount(windows);
+  for (CFIndex i = 0; i < count; ++i) {
+    auto info = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(windows, i));
+
+    int layer = -1;
+    auto layerValue = static_cast<CFNumberRef>(CFDictionaryGetValue(info, kCGWindowLayer));
+    if (layerValue == nullptr || !CFNumberGetValue(layerValue, kCFNumberIntType, &layer) || layer != 0) {
+      continue; // menu bar, dock, pop-ups
+    }
+
+    CGRect bounds;
+    auto boundsValue = static_cast<CFDictionaryRef>(CFDictionaryGetValue(info, kCGWindowBounds));
+    if (boundsValue == nullptr || !CGRectMakeWithDictionaryRepresentation(boundsValue, &bounds)) {
+      continue;
+    }
+
+    // the list runs front to back, so the first window under the cursor is the one
+    if (CGRectContainsPoint(CGRectInset(bounds, -2, -2), cursor)) {
+      dragged = cursor.y <= CGRectGetMinY(bounds) + kTitleStrip;
+      LOG_INFO(
+          "app handoff: window at %.0f,%.0f size %.0fx%.0f, cursor at %.0f,%.0f: %s", bounds.origin.x, bounds.origin.y,
+          bounds.size.width, bounds.size.height, cursor.x, cursor.y, dragged ? "held by its title" : "held elsewhere"
+      );
+      break;
+    }
+  }
+  CFRelease(windows);
+  return dragged;
 }
 
 void cancelWindowDrag()

@@ -229,6 +229,9 @@ public:
   //! The next piece of the arriving file.
   void handoffData(const std::string &chunk);
 
+  //! The app this computer sent has been opened at the other end, or couldn't be.
+  void handoffDelivered(bool opened);
+
   //! The DirectionMask of this computer's edges that lead to the server.
   uint32_t swapEdges() const
   {
@@ -258,6 +261,7 @@ private:
   void handleDisconnectRequested(const Event &event);
   void handleShapeChanged();
   void handleHandoffCaptured(const Event &event);
+  void handleHandoffOpened(const Event &event);
   void handleClipboardGrabbed(const Event &event);
   void handleHello();
   void handleSuspend();

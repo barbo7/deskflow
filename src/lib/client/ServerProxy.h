@@ -74,6 +74,12 @@ public:
   {
     (void)chunk;
   }
+
+  //! The app that was moved here has been opened, or couldn't be.
+  virtual void sendHandoffAck(bool opened)
+  {
+    (void)opened;
+  }
   bool onGrabClipboard(ClipboardID);
   void onClipboardChanged(ClipboardID, const IClipboard *);
 

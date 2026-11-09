@@ -131,6 +131,12 @@ public:
     (void)chunk;
   }
 
+  //! The app this client was moving has been opened, or couldn't be. 1.10+ clients only.
+  virtual void sendHandoffAck(bool opened)
+  {
+    (void)opened;
+  }
+
   //@}
 
   // IComputer

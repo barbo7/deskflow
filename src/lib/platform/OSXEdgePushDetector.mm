@@ -215,7 +215,7 @@ private:
 
     if (leftButtonHeld) {
       if (m_onDragPush && m_dragAccumulator.feed(dx, dy, at, EdgePushAccumulator::Clock::now())) {
-        LOG_DEBUG("pushed against an edge with the left button held");
+        LOG_INFO("pushed against an edge with the left button held");
         m_onDragPush(EdgePushAccumulator::pushDirection(dx, dy, at));
       }
       return;

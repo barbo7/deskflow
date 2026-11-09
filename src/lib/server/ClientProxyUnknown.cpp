@@ -25,6 +25,7 @@
 #include "server/ClientProxy1_8.h"
 #include "server/ClientProxy1_9.h"
 #include "server/ClientProxy1_10.h"
+#include "server/ClientProxy1_11.h"
 #include "server/Server.h"
 
 //
@@ -185,6 +186,10 @@ void ClientProxyUnknown::initProxy(const std::string &name, int major, int minor
 
     case 10:
       m_proxy = new ClientProxy1_10(name, m_stream, m_server, m_events);
+      break;
+
+    case 11:
+      m_proxy = new ClientProxy1_11(name, m_stream, m_server, m_events);
       break;
 
     default:

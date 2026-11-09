@@ -17,9 +17,14 @@ CapturedApp captureFrontApp()
   return {};
 }
 
-void closeCapturedTab(const CapturedApp &)
+void closeCapturedApp(const CapturedApp &)
 {
   // nothing was captured
+}
+
+void forgetCapturedApp(const CapturedApp &)
+{
+  // nothing is held
 }
 
 bool isWindowBeingDragged()

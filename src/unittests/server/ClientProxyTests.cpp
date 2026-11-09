@@ -17,6 +17,7 @@
 #include "server/ClientProxy1_8.h"
 #include "server/ClientProxy1_9.h"
 #include "server/ClientProxy1_10.h"
+#include "server/ClientProxy1_11.h"
 
 #include <memory>
 #include <string>
@@ -128,6 +129,9 @@ std::unique_ptr<ClientProxy> makeProxy(int minor, deskflow::IStream *stream, IEv
     break;
   case 10:
     proxy = std::make_unique<ClientProxy1_10>("client", stream, server, events);
+    break;
+  case 11:
+    proxy = std::make_unique<ClientProxy1_11>("client", stream, server, events);
     break;
   default:
     break;
@@ -350,6 +354,28 @@ void ClientProxyTests::requestHandoffDrag()
 
   ProxyUnderTest test(minor);
   test.proxy->requestHandoffDrag("pc");
+  QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::sendHandoffAck_data()
+{
+  QTest::addColumn<int>("minor");
+  QTest::addColumn<bool>("opened");
+  QTest::addColumn<QByteArray>("expected");
+
+  QTest::newRow("1.10") << 10 << true << QByteArray();
+  QTest::newRow("1.11 opened") << 11 << true << "DHAK" + QByteArray::fromHex("01");
+  QTest::newRow("1.11 failed") << 11 << false << "DHAK" + QByteArray::fromHex("00");
+}
+
+void ClientProxyTests::sendHandoffAck()
+{
+  QFETCH(int, minor);
+  QFETCH(bool, opened);
+  QFETCH(QByteArray, expected);
+
+  ProxyUnderTest test(minor);
+  test.proxy->sendHandoffAck(opened);
   QCOMPARE(test.stream->take(), expected);
 }
 

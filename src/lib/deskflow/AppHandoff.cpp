@@ -211,6 +211,23 @@ const App *findAppByWindowsExe(const QString &exeFileName)
   return it == apps.end() ? nullptr : &*it;
 }
 
+bool closesWithTabKey(const QString &appId)
+{
+  static const QStringList editors = {QStringLiteral("vscode"), QStringLiteral("cursor"), QStringLiteral("sublime")};
+  const auto *app = findAppById(appId);
+  return app != nullptr && (app->isBrowser || editors.contains(appId));
+}
+
+bool hasNoDocuments(const QString &appId)
+{
+  static const QStringList apps = {
+      QStringLiteral("spotify"), QStringLiteral("slack"),    QStringLiteral("discord"),  QStringLiteral("teams"),
+      QStringLiteral("zoom"),    QStringLiteral("telegram"), QStringLiteral("whatsapp"), QStringLiteral("notion"),
+      QStringLiteral("figma"),   QStringLiteral("obsidian"),
+  };
+  return apps.contains(appId);
+}
+
 bool isAllowedUrl(const QString &url)
 {
   if (url.isEmpty() || url.size() > 8192) {

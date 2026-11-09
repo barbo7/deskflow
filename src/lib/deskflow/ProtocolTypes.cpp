@@ -59,6 +59,7 @@ const char *const kMsgDHandoffRequest = "DHRQ%s";
 const char *const kMsgDHandoffDrag = "DHDR%s";
 const char *const kMsgDHandoffStart = "DHST%s%s%s%s%4i";
 const char *const kMsgDHandoffData = "DHDT%s";
+const char *const kMsgDHandoffAck = "DHAK%1i";
 const char *const kMsgQInfo = "QINF";
 const char *const kMsgEIncompatible = "EICV%2i%2i";
 const char *const kMsgEBusy = "EBSY";

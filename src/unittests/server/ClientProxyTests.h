@@ -32,6 +32,8 @@ private Q_SLOTS:
   void requestHandoffCapture();
   void requestHandoffDrag_data();
   void requestHandoffDrag();
+  void sendHandoffAck_data();
+  void sendHandoffAck();
   void supportsHandoff_from1_10();
   void sendSwapInfo_data();
   void sendSwapInfo();

@@ -12,6 +12,7 @@ class AppHandoffTests : public QObject
 private Q_SLOTS:
   void apps_findsSameAppFromBothPlatforms();
   void apps_idsAreUnique();
+  void apps_knowHowTheyClose();
   void url_acceptsWeb();
   void url_refusesEverythingElse();
   void fileName_stripsPaths();

@@ -218,6 +218,9 @@ public:
 
   //! The next piece of the file of the app \p source is moving.
   void handleHandoffData(BaseClientProxy *source, const std::string &chunk);
+
+  //! \p from has opened the app that was moved to it, or couldn't.
+  void handleHandoffAck(const BaseClientProxy *from, bool opened);
   size_t getMaximumClipboardSizeBytes() const;
 
   //! Move the cursor to the computer called \p computer (from the gui or a client request).
@@ -344,6 +347,7 @@ private:
   void feedRemoteDragPush(int32_t dx, int32_t dy, int32_t ax, int32_t ay, int32_t aw, int32_t ah);
   std::string dragTarget(Direction direction) const;
   void handleHandoffCaptured(const Event &event);
+  void handleHandoffOpened(const Event &event);
   std::string nextHandoffTarget(const BaseClientProxy *source) const;
   void handleClipboardGrabbed(const Event &event, BaseClientProxy *client);
   void handleClipboardChanged(const Event &event, BaseClientProxy *client);

@@ -34,6 +34,21 @@ void AppHandoffTests::apps_idsAreUnique()
   }
 }
 
+void AppHandoffTests::apps_knowHowTheyClose()
+{
+  QVERIFY(closesWithTabKey(QStringLiteral("chrome")));
+  QVERIFY(closesWithTabKey(QStringLiteral("vscode")));
+  QVERIFY(!closesWithTabKey(QStringLiteral("word")));
+  QVERIFY(!closesWithTabKey(QStringLiteral("unknown")));
+
+  QVERIFY(hasNoDocuments(QStringLiteral("spotify")));
+  QVERIFY(!hasNoDocuments(QStringLiteral("word")));
+  QVERIFY(!hasNoDocuments(QStringLiteral("chrome")));
+  for (const auto &app : knownApps()) {
+    QVERIFY2(!(app.isBrowser && hasNoDocuments(app.id)), qPrintable(app.id));
+  }
+}
+
 void AppHandoffTests::url_acceptsWeb()
 {
   QVERIFY(isAllowedUrl(QStringLiteral("https://github.com/deskflow/deskflow?tab=readme#top")));
