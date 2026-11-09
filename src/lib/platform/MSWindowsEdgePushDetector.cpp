@@ -14,8 +14,10 @@
 #endif
 #include <Windows.h>
 
+#include <chrono>
 #include <future>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace deskflow {
@@ -101,6 +103,14 @@ private:
     // check now and then whether we can still control the input desktop
     SetTimer(window, kDesktopTimer, 500, nullptr);
 
+    // ctrl+alt+win+arrow toward the server: the keyboard way to take over as server
+    for (const auto &[mask, key] : kArrowKeys) {
+      if ((m_edges & mask) != 0 &&
+          !RegisterHotKey(window, static_cast<int>(key), MOD_CONTROL | MOD_ALT | MOD_WIN | MOD_NOREPEAT, key)) {
+        LOG_WARN("can't register the ctrl+alt+win+arrow hotkey, another app may be using it");
+      }
+    }
+
     started.set_value(window);
 
     MSG message;
@@ -120,6 +130,12 @@ private:
       }
       break;
 
+    case WM_HOTKEY:
+      if (self != nullptr) {
+        self->handleHotKey();
+      }
+      return 0;
+
     case WM_TIMER:
       if (self != nullptr && wParam == kDesktopTimer) {
         self->checkInputDesktop();
@@ -128,6 +144,9 @@ private:
 
     case WM_CLOSE: {
       KillTimer(window, kDesktopTimer);
+      for (const auto &arrow : kArrowKeys) {
+        UnregisterHotKey(window, static_cast<int>(arrow.second));
+      }
       RAWINPUTDEVICE device = {};
       device.usUsagePage = 0x01;
       device.usUsage = 0x02;
@@ -146,6 +165,18 @@ private:
       break;
     }
     return DefWindowProcW(window, message, wParam, lParam);
+  }
+
+  void handleHotKey()
+  {
+    // one swap per press; the swap restarts deskflow, so ignore presses while it does
+    const auto now = EdgePushAccumulator::Clock::now();
+    if (now - m_lastHotKey < std::chrono::seconds(5)) {
+      return;
+    }
+    m_lastHotKey = now;
+    LOG_INFO("hotkey pressed toward the server, asking to swap roles");
+    m_onPush();
   }
 
   void checkInputDesktop()
@@ -217,12 +248,20 @@ private:
   }
 
   static constexpr UINT_PTR kDesktopTimer = 1;
+  // DirectionMask bit and virtual key of each arrow
+  static constexpr std::pair<uint32_t, UINT> kArrowKeys[] = {
+      {static_cast<uint32_t>(DirectionMask::LeftMask), VK_LEFT},
+      {static_cast<uint32_t>(DirectionMask::RightMask), VK_RIGHT},
+      {static_cast<uint32_t>(DirectionMask::TopMask), VK_UP},
+      {static_cast<uint32_t>(DirectionMask::BottomMask), VK_DOWN},
+  };
 
   uint32_t m_edges;
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
   Callback m_onInputBlocked;
   bool m_inputBlocked = false;
+  EdgePushAccumulator::Clock::time_point m_lastHotKey;
   HWND m_window = nullptr;
   std::thread m_thread;
 };

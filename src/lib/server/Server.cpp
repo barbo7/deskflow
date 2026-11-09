@@ -34,6 +34,7 @@
 #include <cstring>
 #include <ctime>
 #include <sstream>
+#include <utility>
 
 using namespace deskflow::server;
 
@@ -243,6 +244,22 @@ bool Server::setConfig(const ServerConfig &config)
     InputFilter::Rule rule(new InputFilter::KeystrokeCondition(m_events, key));
     rule.adoptAction(new InputFilter::SwitchToComputerAction(m_events, getName(m_primaryClient)), true);
     m_inputFilter->addFilterRule(rule);
+  }
+
+  // ctrl+alt+super+arrow moves the cursor to the computer on that side (control+option+command
+  // on a mac). a client watches the same keys on its own keyboard to take over as server.
+  {
+    using enum Direction;
+    const std::pair<KeyID, Direction> arrows[] = {
+        {kKeyLeft, Left}, {kKeyRight, Right}, {kKeyUp, Top}, {kKeyDown, Bottom}
+    };
+    for (const auto &[key, dir] : arrows) {
+      IPlatformComputer::KeyInfo *info =
+          IPlatformComputer::KeyInfo::alloc(key, KeyModifierControl | KeyModifierAlt | KeyModifierSuper, 0, 0);
+      InputFilter::Rule rule(new InputFilter::KeystrokeCondition(m_events, info));
+      rule.adoptAction(new InputFilter::SwitchInDirectionAction(m_events, dir), true);
+      m_inputFilter->addFilterRule(rule);
+    }
   }
 
   // tell primary computer about reconfiguration

@@ -8,6 +8,7 @@
 
 #include "deskflow/ClientApp.h"
 
+#include "arch/Arch.h"
 #include "base/Event.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
@@ -265,7 +266,11 @@ void ClientApp::requestRoleSwap()
   // the server will connect back to us as a client, so tell it where we are. addresses on the
   // same network as the server go first: others (vpn, virtual machine adapters) may not be
   // reachable from it, and each one it tries costs a connection timeout.
-  const QHostAddress server(QString::fromStdString(getCurrentServerAddress().getHostname()));
+  // the address we're actually connected to: the configured one may be a host name
+  QHostAddress server(QString::fromStdString(getCurrentServerAddress().getHostname()));
+  if (server.isNull() && getCurrentServerAddress().isValid()) {
+    server = QHostAddress(QString::fromStdString(ARCH->addrToString(getCurrentServerAddress().getAddress())));
+  }
   QStringList sameNetwork;
   QStringList others;
   for (const auto &interface : QNetworkInterface::allInterfaces()) {

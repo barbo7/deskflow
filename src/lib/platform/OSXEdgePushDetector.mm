@@ -12,6 +12,7 @@
 #include <ApplicationServices/ApplicationServices.h>
 
 #include <algorithm>
+#include <chrono>
 #include <future>
 #include <thread>
 #include <unistd.h>
@@ -27,7 +28,8 @@ class OSXEdgePushDetector : public EdgePushDetector
 {
 public:
   OSXEdgePushDetector(uint32_t edges, Callback onPush)
-      : m_accumulator(edges, kPushThreshold),
+      : m_edges(edges),
+        m_accumulator(edges, kPushThreshold),
         m_onPush(std::move(onPush))
   {
   }
@@ -42,6 +44,9 @@ public:
     }
     if (m_tap != nullptr) {
       CFRelease(m_tap);
+    }
+    if (m_keyTap != nullptr) {
+      CFRelease(m_keyTap);
     }
   }
 
@@ -62,16 +67,35 @@ public:
       return false;
     }
 
+    // a separate tap for the keyboard: if it isn't allowed, mouse pushes still work
+    m_keyTap = CGEventTapCreate(
+        kCGSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionListenOnly, CGEventMaskBit(kCGEventKeyDown),
+        &OSXEdgePushDetector::onEvent, this
+    );
+    if (m_keyTap == nullptr) {
+      LOG_WARN("can't watch the keyboard for the role swap hotkey");
+    }
+
     std::promise<CFRunLoopRef> started;
     auto runLoop = started.get_future();
     m_thread = std::thread([this, &started] {
       CFRunLoopSourceRef source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, m_tap, 0);
       CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
       CGEventTapEnable(m_tap, true);
+      CFRunLoopSourceRef keySource = nullptr;
+      if (m_keyTap != nullptr) {
+        keySource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, m_keyTap, 0);
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), keySource, kCFRunLoopCommonModes);
+        CGEventTapEnable(m_keyTap, true);
+      }
       started.set_value(CFRunLoopGetCurrent());
       CFRunLoopRun();
       CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
       CFRelease(source);
+      if (keySource != nullptr) {
+        CFRunLoopRemoveSource(CFRunLoopGetCurrent(), keySource, kCFRunLoopCommonModes);
+        CFRelease(keySource);
+      }
     });
     m_runLoop = runLoop.get();
     LOG_DEBUG("watching the mouse for role swaps");
@@ -84,6 +108,9 @@ private:
     auto *self = static_cast<OSXEdgePushDetector *>(refcon);
     if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
       CGEventTapEnable(self->m_tap, true);
+      if (self->m_keyTap != nullptr) {
+        CGEventTapEnable(self->m_keyTap, true);
+      }
       return event;
     }
 
@@ -92,11 +119,59 @@ private:
       return event;
     }
 
+    if (type == kCGEventKeyDown) {
+      self->handleKey(event);
+      return event;
+    }
+
     self->handleMove(
         CGEventGetLocation(event), static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaX)),
         static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaY))
     );
     return event;
+  }
+
+  void handleKey(CGEventRef event)
+  {
+    // control+option+command+arrow toward the server, without shift
+    const CGEventFlags wanted = kCGEventFlagMaskControl | kCGEventFlagMaskAlternate | kCGEventFlagMaskCommand;
+    const CGEventFlags flags = CGEventGetFlags(event);
+    if ((flags & wanted) != wanted || (flags & kCGEventFlagMaskShift) != 0) {
+      return;
+    }
+    if (CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat) != 0) {
+      return;
+    }
+
+    uint32_t edge = 0;
+    switch (CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)) {
+    case 123: // left arrow
+      edge = static_cast<uint32_t>(DirectionMask::LeftMask);
+      break;
+    case 124: // right arrow
+      edge = static_cast<uint32_t>(DirectionMask::RightMask);
+      break;
+    case 125: // down arrow
+      edge = static_cast<uint32_t>(DirectionMask::BottomMask);
+      break;
+    case 126: // up arrow
+      edge = static_cast<uint32_t>(DirectionMask::TopMask);
+      break;
+    default:
+      return;
+    }
+    if ((m_edges & edge) == 0) {
+      return;
+    }
+
+    // one swap per press; the swap restarts deskflow, so ignore presses while it does
+    const auto now = EdgePushAccumulator::Clock::now();
+    if (now - m_lastHotKey < std::chrono::seconds(5)) {
+      return;
+    }
+    m_lastHotKey = now;
+    LOG_INFO("hotkey pressed toward the server, asking to swap roles");
+    m_onPush();
   }
 
   void handleMove(CGPoint location, double dx, double dy)
@@ -124,9 +199,12 @@ private:
     }
   }
 
+  uint32_t m_edges;
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
+  EdgePushAccumulator::Clock::time_point m_lastHotKey;
   CFMachPortRef m_tap = nullptr;
+  CFMachPortRef m_keyTap = nullptr;
   CFRunLoopRef m_runLoop = nullptr;
   std::thread m_thread;
 };

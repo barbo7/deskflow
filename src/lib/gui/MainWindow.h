@@ -126,6 +126,8 @@ private:
   void finishRoleSwap();
   void revertRoleSwap();
   static void shareTrustAcrossRoles();
+  static QString writeSwapConfig(const QString &config);
+  inline static const auto kSwapConfigName = QStringLiteral("deskflow-server-swap.conf");
   void startCoreWhenStopped(int attempts = 50);
   void updateActiveComputerBar();
   bool setActiveComputerTrayIcon();

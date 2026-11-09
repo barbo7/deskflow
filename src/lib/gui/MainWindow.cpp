@@ -53,8 +53,10 @@
 #include <QRegularExpressionValidator>
 #include <QScreen>
 #include <QScrollBar>
+#include <QStandardPaths>
 #include <QTimer>
 
+#include <algorithm>
 #include <memory>
 
 #if defined(Q_OS_MACOS)
@@ -712,8 +714,16 @@ void MainWindow::handleActiveComputerChanged(const QString &active, const QStrin
   if (active == m_activeComputer && computers == m_computers)
     return;
 
-  if (m_roleSwapRole == QStringLiteral("server") && computers.size() >= 2)
+  if (m_roleSwapRole == QStringLiteral("server") && computers.size() >= 2) {
     finishRoleSwap();
+    // the user was heading for the other computer: take the cursor there
+    for (const auto &entry : computers) {
+      if (const auto name = entry.section('|', 0, 0); name != active) {
+        QTimer::singleShot(300, this, [this, name] { m_coreProcess.requestSwitchToComputer(name); });
+        break;
+      }
+    }
+  }
 
   m_activeComputer = active;
   m_computers = computers;
@@ -791,19 +801,32 @@ void MainWindow::handleRoleSwap(const QString &role, const QString &data)
     ui->rbModeClient->setChecked(true);
   } else if (role == QStringLiteral("server")) {
     qInfo("role swap: becoming the server");
-    // a computer that was only ever a client has no layout of its own: use the old server's
-    if (m_serverConfig.numComputers() < 2 && !data.isEmpty()) {
-      const auto path = QDir(Settings::settingsPath()).filePath(QStringLiteral("deskflow-server-swap.conf"));
-      QFile file(path);
-      if (file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-        file.write(data.toUtf8());
-        file.close();
-        Settings::setValue(Settings::Server::ExternalConfig, true);
-        Settings::setValue(Settings::Server::ExternalConfigFile, path);
-        qInfo().noquote() << "role swap: using the old server's layout from" << path;
-      } else {
-        qWarning().noquote() << "role swap: can't write" << path;
+    // our own layout will do only if it already has every connected computer; a computer that
+    // was only ever a client doesn't, so it uses the layout the old server sent
+    bool ownLayoutFits = !m_computers.isEmpty();
+    for (const auto &entry : std::as_const(m_computers)) {
+      const auto name = entry.section('|', 0, 0);
+      const auto &computers = std::as_const(m_serverConfig).computers();
+      const bool known = std::any_of(computers.begin(), computers.end(), [&name](const auto &computer) {
+        return !computer.isNull() && (computer.name() == name || computer.aliases().contains(name));
+      });
+      ownLayoutFits = ownLayoutFits && known;
+    }
+
+    if (ownLayoutFits) {
+      // undo an earlier swap's borrowed layout
+      if (Settings::value(Settings::Server::ExternalConfigFile).toString().endsWith(kSwapConfigName))
+        Settings::setValue(Settings::Server::ExternalConfig, false);
+    } else {
+      const auto path = writeSwapConfig(data);
+      if (path.isEmpty()) {
+        // don't stop being a client: the server only gives up its role once we disconnect
+        qWarning("role swap: no usable layout to become the server with, not swapping");
+        return;
       }
+      Settings::setValue(Settings::Server::ExternalConfig, true);
+      Settings::setValue(Settings::Server::ExternalConfigFile, path);
+      qInfo().noquote() << "role swap: using the old server's layout from" << path;
     }
     ui->rbModeServer->setChecked(true);
   } else {
@@ -830,6 +853,33 @@ void MainWindow::handleRoleSwap(const QString &role, const QString &data)
     connect(m_roleSwapTimer, &QTimer::timeout, this, &MainWindow::revertRoleSwap);
   }
   m_roleSwapTimer->start(45000);
+}
+
+QString MainWindow::writeSwapConfig(const QString &config)
+{
+  if (config.isEmpty())
+    return {};
+
+  // the settings folder can be read-only for the gui (e.g. ProgramData on Windows), so fall
+  // back to folders the user can always write
+  const QStringList folders = {
+      Settings::settingsPath(), QStandardPaths::writableLocation(QStandardPaths::AppDataLocation), QDir::tempPath()
+  };
+  for (const auto &folder : folders) {
+    if (folder.isEmpty() || !QDir().mkpath(folder))
+      continue;
+    const auto path = QDir(folder).filePath(kSwapConfigName);
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+      continue;
+    const auto bytes = config.toUtf8();
+    const bool written = file.write(bytes) == bytes.size();
+    file.close();
+    if (written && QFile(path).open(QIODevice::ReadOnly))
+      return path;
+    qWarning().noquote() << "role swap: couldn't write" << path;
+  }
+  return {};
 }
 
 void MainWindow::finishRoleSwap()
