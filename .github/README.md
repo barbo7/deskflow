@@ -1,198 +1,91 @@
-> [!IMPORTANT]
-> **This is an unofficial fork of [Deskflow](https://github.com/deskflow/deskflow), not affiliated with or supported by the Deskflow project.**
-> Please report problems with this fork here, not to the Deskflow team.
->
-> **What it adds:** use the mouse and keyboard of *either* computer on both, without switching server and client by hand.
-> Push the client's own mouse against the edge that leads to the server (or press `Ctrl+Alt+Win+arrow` / `Control+Option+Command+arrow`) and the two computers swap roles in a few seconds, with clipboard sharing intact.
-> Also adds an "in use" indicator, "Switch to" buttons, an escape hotkey (`...+M`), a 45-second automatic revert if a swap fails, and protection against swaps while a game has the mouse.
->
-> **Install:** download the [`roleswap-1` release](https://github.com/barbo7/deskflow/releases/tag/roleswap-1) on **both** computers. On Windows, set the process mode to **Desktop** (role swaps don't work in Service mode). Builds are unsigned.
-> **Tested on** one Mac and one Windows x64 PC only; this is experimental. Details (in Turkish): [how it works and how to set it up](https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/docs/AktifBilgisayar-ve-PatronDegisimi.md).
+# Deskflow Roleswap
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-dark-200px.png?raw=true">
-  <source media="(prefers-color-scheme: light)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-light-200px.png?raw=true">
-  <img alt="Deskflow" src="https://github.com/user-attachments/assets/f005b958-24df-4f4a-9bfd-4f834dae59d6">
-</picture>
+**Two-way mouse and keyboard sharing between a Mac and a Windows PC, with clipboard sharing.**
+Use the mouse and keyboard of *either* computer on both, without changing any settings.
 
-**Deskflow** is a free and open source keyboard and mouse sharing app.
-Use the keyboard, mouse, or trackpad of one computer to control nearby computers,
-and work seamlessly between them.
-It's like a software KVM (but without the video).
-TLS encryption is enabled by default. Wayland is supported. Clipboard sharing is supported.
+An unofficial, experimental fork of [Deskflow](https://github.com/deskflow/deskflow) 1.27.0, a software KVM. It isn't affiliated with or supported by the Deskflow project, so please report problems [here](https://github.com/barbo7/deskflow/issues).
 
-> [!TIP]
->
-> **Chat with us**
->
-> - Main discussion on Matrix: [`#deskflow:matrix.org`](https://matrix.to/#/#deskflow:matrix.org) ([Matrix clients](https://matrix.org/ecosystem/clients/))
-> - Discussion also happens on IRC: `#deskflow` or `#deskflow-dev` on [Libera Chat](https://libera.chat/)
-> - Start a [new discussion](https://github.com/deskflow/deskflow/discussions) on our GitHub project.
+**[Türkçe özet](#türkçe)** · **[Download](https://github.com/barbo7/deskflow/releases/tag/roleswap-1)**
 
-## Download
+## Why
 
-[![Downloads: Stable Release](https://img.shields.io/github/downloads/deskflow/deskflow/latest/total?style=for-the-badge&logo=github&label=Download%20Stable)](https://github.com/deskflow/deskflow/releases/latest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[![Downloads: Continuous Build](https://img.shields.io/github/downloads/deskflow/deskflow/continuous/total?style=for-the-badge&logo=github&label=Download%20Continuous)](https://github.com/deskflow/deskflow/releases/continuous)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[![Download From Flathub](https://img.shields.io/flathub/downloads/org.deskflow.deskflow?style=for-the-badge&logo=flathub&label=Download%20from%20flathub)](https://flathub.org/apps/org.deskflow.deskflow)
+In Deskflow and similar tools, only the *server's* mouse and keyboard can cross to the other computer. To use the other computer's mouse, you have to swap server and client by hand on both machines.
 
-> [!NOTE]
-> On Windows, you will need to install the
-> [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-microsoft-visual-c-redistributable-version).  
-> Download latest: [`vc_redist.x64.exe`](https://aka.ms/vc14/vc_redist.x64.exe) [`vc_redist.arm64.exe`](https://aka.ms/vc14/vc_redist.arm64.exe)
+This fork does the swap for you: push a computer's own mouse toward the other screen, and that computer becomes the server.
 
-> [!TIP]
-> For macOS users, the easiest way to install and stay up to date is to use [Homebrew](https://brew.sh) with our [homebrew-tap](https://github.com/deskflow/homebrew-tap).
-> macOS reports unsigned apps as damaged. This occurs because we do not use an Apple certificate for notarization. Clear the quarantine attribute to run the app: `xattr -c Deskflow.app`
+## Features
 
-To use Deskflow, download one of our [packages](https://github.com/deskflow/deskflow/releases), install `deskflow` (from your package repository), or [build it](https://github.com/deskflow/deskflow/wiki/Building) from source.
+| Feature | What it does |
+|---|---|
+| **Automatic role swap** | Push the client's own mouse against the edge facing the server. The computers swap roles in a few seconds and the cursor moves across |
+| **Clipboard sharing** | Copy on one computer, paste on the other, in either role |
+| **Arrow hotkeys** | Move to the computer on that side |
+| **"In use" indicator** | Shows which computer has the cursor, in the main window and tray |
+| **"Switch to" buttons** | Move to the other computer from the main window or tray menu |
+| **Escape hotkey** | Brings the cursor back to the server, even if the other computer stops responding |
+| **Automatic revert** | If a swap doesn't complete within 45 seconds, both computers go back to their old roles |
+| **Game protection (Windows)** | No edge switching or swaps while a game hides or confines the cursor |
+| **Elevation prompt handling (Windows)** | The cursor returns to the server when a UAC prompt or the lock screen appears |
 
-## Stats
+## Hotkeys
 
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/deskflow/deskflow?logo=github)](https://github.com/deskflow/deskflow/commits/master/)
-[![GitHub top language](https://img.shields.io/github/languages/top/deskflow/deskflow?logo=github)](https://github.com/deskflow/deskflow/commits/master/)
-[![GitHub License](https://img.shields.io/github/license/deskflow/deskflow?logo=github)](LICENSE)
-[![REUSE status](https://api.reuse.software/badge/github.com/deskflow/deskflow)](https://api.reuse.software/info/github.com/deskflow/deskflow)
+| | Windows | Mac |
+|---|---|---|
+| Move left or right | `Ctrl` + `Alt` + `Win` + `←` / `→` | `Control` + `Option` + `Command` + `←` / `→` |
+| Escape to the server | `Ctrl` + `Alt` + `Win` + `M` | `Control` + `Option` + `Command` + `M` |
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=deskflow_deskflow&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=deskflow_deskflow)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=deskflow_deskflow&metric=coverage)](https://sonarcloud.io/summary/new_code?id=deskflow_deskflow)
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=deskflow_deskflow&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=deskflow_deskflow)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=deskflow_deskflow&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=deskflow_deskflow)
+On the server's keyboard, the switch is instant. On the client's keyboard, pressing the arrow toward the server swaps roles first.
 
-[![CI](https://github.com/deskflow/deskflow/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/deskflow/deskflow/actions/workflows/continuous-integration.yml)
-[![CodeQL Analysis](https://github.com/deskflow/deskflow/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/deskflow/deskflow/actions/workflows/codeql-analysis.yml)
-[![SonarCloud Analysis](https://github.com/deskflow/deskflow/actions/workflows/sonarcloud-analysis.yml/badge.svg)](https://github.com/deskflow/deskflow/actions/workflows/sonarcloud-analysis.yml)
+## Install
 
-## Contribute
+Install the [`roleswap-1` release](https://github.com/barbo7/deskflow/releases/tag/roleswap-1) on **both** computers, and check the downloads against `sums.txt`. Builds are unsigned.
 
-[![Good first issues](https://img.shields.io/github/issues/deskflow/deskflow/good%20first%20issue?label=good%20first%20issues&color=%2344cc11)](https://github.com/deskflow/deskflow/labels/good%20first%20issue)
+**Windows** (`.msi`)
 
-There are many ways to contribute to the Deskflow project.
+1. Install the [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) if you don't have it.
+2. Run the installer. An "unknown publisher" warning is expected.
+3. In Deskflow's settings, set the process mode to **Desktop**. Role swaps don't work in Service mode.
 
-We're a friendly, active, and welcoming community focused on building a great app.
+**Mac** (`.dmg`, macOS 13 or later on Apple Silicon)
 
-Read our [Contributing](https://github.com/deskflow/deskflow/wiki/Contributing) page to get started.
+1. Copy the app to `/Applications/Deskflow Roleswap.app`.
+2. Prepare it. The new identifier keeps its permissions separate from an official Deskflow install:
 
-For instructions on building Deskflow, use the wiki page: [Building](https://github.com/deskflow/deskflow/wiki/Building)
+   ```bash
+   APP="/Applications/Deskflow Roleswap.app"
+   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier org.deskflow.deskflow.roleswap" "$APP/Contents/Info.plist"
+   xattr -dr com.apple.quarantine "$APP"
+   codesign --force --deep -s - "$APP"
+   ```
 
-## Operating Systems
+3. Add the app under System Settings → Privacy & Security → Accessibility.
 
-We support all major operating systems, including Windows, macOS, Linux, and Unix-like BSD-derived.
+**Then on both computers**
 
-Windows 10 v1809 or higher is required.
+1. Make one computer the server. In *Configure Server*, place the other computer on the correct side, using its exact name.
+2. Make the other a client and enter the server's IP address.
+3. Accept the fingerprint prompts on the first connection.
 
-macOS 13 or higher is required to use our CI builds for Apple Silicon machines. macOS 12 or higher is required for Intel macs or local builds.
+## How it works
 
-Linux requires libei 1.3+ and libportal 0.8+ for the server/client. Additionally, Qt 6.7+ is required for the GUI.
-Linux users with systems not meeting these requirements should use flatpak in place of a native package.
+The client watches its physical mouse, ignoring input Deskflow injects. When the mouse is pushed toward the server, the client asks to swap. The server sends its layout and agrees, the client restarts as the server, and the old server reconnects to it as a client. This uses protocol 1.9; older Deskflow versions negotiate down to 1.8 and can't swap roles.
 
-We officially support FreeBSD, and would also like to support: OpenBSD, NetBSD, DragonFly, Solaris.
+See the [full guide (in Turkish)](https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/docs/AktifBilgisayar-ve-PatronDegisimi.md) for the architecture and a ready-to-paste setup prompt for Claude Code.
 
-## Repology
+## Status and limits
 
-Repology monitors a huge number of package repositories and other sources comparing package
-versions across them and gathering other information.
+- **Confirmed working:** role swaps in both directions between one Mac built from this source and one Windows x64 PC in Desktop mode.
+- **Not tested:** the macOS `.dmg` files, Windows on ARM, and setups with more than two computers.
+- **Windows Service mode:** role swaps don't work.
+- **Desktop mode on Windows:** the other computer's mouse can't control windows running as administrator.
+- **Linux:** the indicator and buttons work, but pushing the mouse doesn't trigger a swap.
 
-[![Repology](https://repology.org/badge/vertical-allrepos/deskflow.svg?columns=2&exclude_unsupported)](https://repology.org/project/deskflow/versions)
+## Türkçe
 
-## Installing on macOS
+Bir Mac ile bir Windows bilgisayarı **iki yönlü** kullanmak için Deskflow'un gayriresmi sürümü. Hangi bilgisayarın faresini ekranın kenarına itersen o bilgisayar patron olur; böylece iki bilgisayarın faresi ve klavyesi de iki ekranda çalışır. Kopyala-yapıştır da çalışmaya devam eder.
 
-When you install Deskflow on macOS, you need to allow accessibility access (Privacy & Security) to both the `Deskflow` app and the `deskflow` process.
-
-If using Sequoia, you may also need to allow `Deskflow` under Local Network‍ settings (Privacy & Security).
-When prompted by the OS, go to the settings and enable the access.
-
-If you are upgrading and you already have `Deskflow` or `deskflow`
-on the allowed list you will need to manually remove them before accessibility access can be granted to the new version.
-
-macOS users who download directly from releases may need to run `xattr -c /Applications/Deskflow.app` after copying the app to the `Applications` dir.
-
-It is recommended to install Deskflow using [Homebrew](https://brew.sh) from our [homebrew-tap](https://github.com/deskflow/homebrew-tap)
-
-To add our tap, run:
-
-```
-brew tap deskflow/tap
-```
-
-Then install either:
-
-- Stable: `brew install deskflow`
-- Continuous: `brew install deskflow-dev`
-
-## Similar Projects
-
-In the open source developer community, similar projects collaborate for the improvement of all
-mouse and keyboard sharing tools. We aim for idea sharing and interoperability.
-
-- [**Lan Mouse**](https://github.com/feschber/lan-mouse) -
-  Rust implementation with the goal of having native front-ends and interoperability with
-  Deskflow/Synergy.
-- [**Synergy**](https://symless.com/synergy) -
-  Downstream commercial fork. Synergy sponsors Deskflow with financial support and contributes code ([learn more](https://github.com/deskflow/deskflow/wiki/Relationship-with-Synergy)).
-- [**Input Leap**](https://github.com/input-leap/input-leap) -
-  Inactive Deskflow/Synergy-derivative with the goal continuing Barrier development (now a dead fork).
-
-## FAQ
-
-### Is Deskflow compatible with Synergy, Input Leap, or Barrier?
-
-Yes, Deskflow has network compatibility with all forks:
-
-- Requires Deskflow >= v1.17.0.96
-- Deskflow will _just work_ with Input Leap and Barrier (server or client).
-- Connecting a Deskflow client to a Synergy 1 server will also _just work_.
-- To connect a Synergy 1 client, you need to select the Synergy protocol in the Deskflow server settings.
-
-_Note:_ Only Synergy 1 is compatible with Deskflow (Synergy 3 is not yet compatible).
-
-### Is Deskflow compatible with Lan Mouse?
-
-We would love to see compatibility with Lan Mouse. This may be quite an effort as currently the way they handle the generated input is very different.
-
-### If I want to solve issues in Deskflow do I need to contribute to a fork?
-
-We welcome PRs (pull requests) from the community. If you'd like to make a change, please feel
-free to [start a discussion](https://github.com/deskflow/deskflow/discussions) or
-[open a PR](https://github.com/deskflow/deskflow/wiki/Contributing).
-
-### Is clipboard sharing supported?
-
-Absolutely. The clipboard-sharing feature is a cornerstone feature of the product and we are
-committed to maintaining and improving that feature.
-
-### Is Wayland for Linux supported?
-
-Yes! Wayland (the Linux display server protocol aimed to become the successor of the X Window
-System) is an important platform for us.
-The [`libei`](https://gitlab.freedesktop.org/libinput/libei) and
-[`libportal`](https://github.com/flatpak/libportal) libraries enable
-Wayland support for Deskflow. We would like to give special thanks to Peter Hutterer,
-who is the author of `libei`, a major contributor to `libportal`, and the author of the Wayland
-implementation in Deskflow. Others such as Olivier Fourdan and Povilas Kanapickas helped with the
-Wayland implementation.
-
-Some features _may_ be unavailable or broken on Wayland. Please see the [known Wayland issues](https://github.com/deskflow/deskflow/discussions/7499).
-
-### Where did it all start?
-
-Deskflow was first created as Synergy in 2001 by Chris Schoeneman.
-Read about the [history of the project](https://github.com/deskflow/deskflow/wiki/History) on our
-wiki.
-
-## Meow'Dib (our mascot)
-
-![Meow'Dib](https://github.com/user-attachments/assets/726f695c-3dfb-4abd-875d-ed658f6c610f)
-
-## Deskflow Contributors
-
-[![Sponsored by Synergy](https://raw.githubusercontent.com/deskflow/deskflow-artwork/b2c72a3e60a42dee793bd47efc275b5ee0bdaa5f/misc/synergy-sponsor.svg)](https://symless.com/synergy)
-
-[Synergy](https://symless.com/synergy) sponsors the Deskflow project by contributing code and providing financial support ([learn more](https://github.com/deskflow/deskflow/wiki/Relationship-with-Synergy)).
-
-Deskflow is made by possible by these contributors.
-
- <a href = "https://github.com/deskflow/deskflow/graphs/contributors">
-   <img src = "https://contrib.rocks/image?repo=deskflow/deskflow"/>
- </a>
+[Kurulum dosyaları](https://github.com/barbo7/deskflow/releases/tag/roleswap-1) · [Nasıl çalışır ve nasıl kurulur](https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/docs/AktifBilgisayar-ve-PatronDegisimi.md)
 
 ## License
 
-This project is licensed under [GPL-2.0](LICENSE) with an [OpenSSL exception](../LICENSES/LicenseRef-OpenSSL-Exception.txt).
+[GPL-2.0](https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/LICENSE) with an [OpenSSL exception](https://github.com/barbo7/deskflow/blob/feat/active-computer-indicator/LICENSES/LicenseRef-OpenSSL-Exception.txt). Based on [Deskflow](https://github.com/deskflow/deskflow) and its contributors' work.
