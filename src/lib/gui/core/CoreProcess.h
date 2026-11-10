@@ -158,6 +158,8 @@ private:
   QString m_secureSocketVersion;
   std::optional<ProcessMode> m_lastProcessMode = std::nullopt;
   QTimer m_retryTimer;
+  //! cores we asked to stop because this gui didn't start them, since the last one it talked to
+  int m_strayCoreStops = 0;
   static constexpr int kCoreIpcRetryDelay = 2000; // ms
   deskflow::gui::ipc::CoreIpcClient *m_coreIpcClient = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;

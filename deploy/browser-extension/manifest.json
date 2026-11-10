@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Deskflow Handoff",
+  "description": "Moves browser tabs to another computer with Deskflow, keeping your place on the page.",
+  "version": "1.0.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxuEkShU/5CE0hZS2kz0pDn8riN1gaU9pcfRVupy2L0829lRjTFKAkfRc9txwZe2hyOkuy2z4jiG9+Aij2T/s6Lh9oSi58XiUwFc3HcdT8vu3uoMhMKBgVsmq68x2JJtHC8cCk/P/FaWszfRUWM/GXbQG4rCiFnXj8b5sZJo6pShfzXyRFdvMp+abvNOj1S80JEcQlXfs6AVphWXlijtM5yKb4L7iGOYFGvHCn7LO5+cmtDoMCkk3E+pRN3xfg+nPqMVHEbU9+qQGmJTXiJBt+jfnxHOfkpGujxnyOyCAwY59vp8dXnDCRWOICybMRgpPmueLPRYyfWL85f0d5GDAHQIDAQAB",
+  "permissions": ["nativeMessaging", "tabs", "scripting", "alarms"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": {
+    "default_title": "Deskflow Handoff",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  }
+}

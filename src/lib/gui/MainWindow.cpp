@@ -716,6 +716,12 @@ void MainWindow::handleActiveComputerChanged(const QString &active, const QStrin
 {
   qInfo().noquote() << "active computer:" << (active.isEmpty() ? QStringLiteral("(none)") : active)
                     << "computers:" << computers.join(QStringLiteral(", "));
+
+  // a client only hears of other computers from the server it's connected to, so this also
+  // means the swap worked, in case the connected state got lost on the way
+  if (m_roleSwapRole == QStringLiteral("client") && m_coreProcess.mode() == CoreMode::Client && computers.size() >= 2)
+    finishRoleSwap();
+
   if (active == m_activeComputer && computers == m_computers)
     return;
 

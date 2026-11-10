@@ -174,6 +174,7 @@ void CoreProcess::connectCoreIpc()
   );
   connect(m_coreIpcClient, &ipc::CoreIpcClient::connected, this, [this] {
     qDebug("connected to core ipc server");
+    m_strayCoreStops = 0;
     if (m_coreIpcClient) {
       m_coreIpcClient->requestActiveComputer();
       m_coreIpcClient->requestMonitors();
@@ -196,7 +197,18 @@ void CoreProcess::checkExistingProcess()
   qInfo("checking existing core");
 
   auto *client = new ipc::CoreIpcClient(this);
-  connect(client, &ipc::CoreIpcClient::connected, this, [client] {
+  connect(client, &ipc::CoreIpcClient::connected, this, [this, client] {
+    // in desktop mode the gui only knows the core it started itself: one it lost track of
+    // (say, a second start raced the first) would keep running in its old mode, and every
+    // later stop or mode change would miss it, so replace it with one we start
+    // (but give up if something keeps starting it again, such as the service)
+    if (Settings::value(Settings::Core::ProcessMode).value<ProcessMode>() == ProcessMode::Desktop &&
+        m_strayCoreStops < 3) {
+      m_strayCoreStops++;
+      qInfo("existing core wasn't started by this gui, asking it to stop");
+      client->sendStop();
+      return;
+    }
     qInfo("existing core has matching version, leaving it running");
     client->deleteLater();
   });
@@ -211,9 +223,16 @@ void CoreProcess::checkExistingProcess()
     m_retryTimer.setSingleShot(true);
     m_retryTimer.start(kRetryDelay);
   });
-  connect(client, &ipc::CoreIpcClient::connectionFailed, this, [client] {
+  connect(client, &ipc::CoreIpcClient::connectionFailed, this, [this, client] {
     qCritical("could not contact existing core");
     client->deleteLater();
+    // most likely it was on its way out; try again rather than leave nothing running
+    if (m_processState == ProcessState::Stopped && m_strayCoreStops < 3) {
+      m_strayCoreStops++;
+      setProcessState(ProcessState::RetryPending);
+      m_retryTimer.setSingleShot(true);
+      m_retryTimer.start(kRetryDelay);
+    }
   });
   client->connectToServer();
 }
@@ -225,6 +244,16 @@ void CoreProcess::onProcessFinished(int exitCode, QProcess::ExitStatus)
 
   if (m_retryTimer.isActive()) {
     m_retryTimer.stop();
+  }
+
+  // the display was asleep or the screen locked: keep trying until it's back, unless the core
+  // was being stopped anyway
+  if (exitCode == s_exitNoDisplay && m_processState == Started) {
+    qInfo("core couldn't use the display, starting it again in a moment");
+    setProcessState(RetryPending);
+    m_retryTimer.setSingleShot(true);
+    m_retryTimer.start(kRetryDelay);
+    return;
   }
 
   if (exitCode != s_exitSuccess) {

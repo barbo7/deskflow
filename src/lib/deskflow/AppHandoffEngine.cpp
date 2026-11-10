@@ -14,6 +14,10 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUrl>
 
 #include <utility>
 
@@ -113,6 +117,39 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
   info->m_appId = captured.appId.toStdString();
   info->m_url = captured.url.toStdString();
 
+  // with the browser's extension there's more to send than the address
+  QList<int> extensionTabs;
+  const auto *known = findAppById(captured.appId);
+  if (known != nullptr && known->isBrowser && ipcHasBrowserHost(captured.appId)) {
+    const auto mode = dragged ? QStringLiteral("drag") : QStringLiteral("hotkey");
+    const auto answer = ipcCaptureBrowserState(captured.appId, mode, captured.url, 1500);
+    if (const auto state = parsePageState(answer); state.has_value()) {
+      LOG_INFO("app handoff: the extension gave %d tab(s)", static_cast<int>(state->urls.size()));
+      info->m_fileName = kPageStateFileName.toStdString();
+      info->m_data.assign(state->json.constData(), static_cast<size_t>(state->json.size()));
+      info->m_url = state->urls.first().toStdString();
+      extensionTabs = state->tabIds;
+    } else if (answer.isEmpty()) {
+      LOG_WARN("app handoff: the browser extension didn't answer, sending only the address");
+    } else {
+      // what kind of answer it was, without what's on the pages
+      const auto object = QJsonDocument::fromJson(answer).object();
+      QStringList kinds;
+      const auto tabs = object.value(QStringLiteral("tabs")).toArray();
+      for (const auto &tab : tabs) {
+        const auto url = tab.toObject().value(QStringLiteral("url")).toString();
+        kinds.append(QUrl(url).scheme() + (isAllowedUrl(url) ? QString() : QStringLiteral("(refused)")));
+      }
+      const auto error = object.value(QStringLiteral("error")).toString().left(200);
+      LOG_WARN(
+          "app handoff: the browser extension's answer (%d bytes, %d tab(s): %s%s%s) has nothing to send, "
+          "sending only the address",
+          static_cast<int>(answer.size()), static_cast<int>(tabs.size()), qPrintable(kinds.join(QLatin1Char(','))),
+          error.isEmpty() ? "" : ", error: ", qPrintable(error)
+      );
+    }
+  }
+
   if (!captured.filePath.isEmpty()) {
     QFile file(captured.filePath);
     if (file.size() > kMaxFileSize) {
@@ -140,6 +177,7 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
   }
   m_sent = captured;
   m_sentAll = sentAll;
+  m_sentTabs = extensionTabs;
 
   if (dragged) {
     cancelWindowDrag();
@@ -166,10 +204,16 @@ void AppHandoffEngine::finishPending(bool opened)
   m_sent.reset();
 
   if (!opened) {
+    LOG_WARN("app handoff: the other computer couldn't open \"%s\", it stays here", qPrintable(sent.displayName));
     tellUser(QStringLiteral("%1 couldn't be opened on the other computer, it stays here").arg(sent.displayName));
   } else if (!m_sentAll) {
+    LOG_INFO("app handoff: \"%s\" opened over there without its page, so it stays here", qPrintable(sent.displayName));
     tellUser(QStringLiteral("%1 opened, but its page or document couldn't be sent, so it stays here").arg(sent.displayName));
+  } else if (!m_sentTabs.isEmpty()) {
+    LOG_INFO("app handoff: opened over there, closing %d tab(s) here", static_cast<int>(m_sentTabs.size()));
+    ipcCloseBrowserTabs(sent.appId, m_sentTabs);
   } else {
+    LOG_INFO("app handoff: opened over there, closing \"%s\" here", qPrintable(sent.displayName));
     closeCapturedApp(sent);
   }
   forgetCapturedApp(sent);
@@ -239,11 +283,42 @@ void AppHandoffEngine::openAndReport(
   );
 }
 
+bool AppHandoffEngine::openPageState(const App *app, const std::string &data)
+{
+  const auto state = parsePageState(QByteArray::fromStdString(data));
+  if (!state.has_value()) {
+    LOG_WARN("app handoff: refusing page state that isn't usable");
+    return false;
+  }
+
+  if (app != nullptr && ipcHasBrowserHost(app->id)) {
+    LOG_INFO(
+        "app handoff: opening %d tab(s) in %s with their page state", static_cast<int>(state->urls.size()),
+        qPrintable(app->displayName)
+    );
+    ipcRestoreBrowserTabs(app->id, state->json);
+    tellUser(QStringLiteral("Opened in %1").arg(app->displayName));
+    return true;
+  }
+
+  // no extension here: the addresses are all that can be used
+  LOG_INFO("app handoff: no browser extension here, opening only the addresses");
+  bool opened = false;
+  for (const auto &url : state->urls) {
+    opened = ((app != nullptr && launchApp(*app, url)) || openWithDefaultApp(url)) || opened;
+  }
+  return opened;
+}
+
 bool AppHandoffEngine::open(
     const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data
 )
 {
   const auto *app = findAppById(QString::fromStdString(appId));
+
+  if (QString::fromStdString(fileName) == kPageStateFileName) {
+    return openPageState(app, data);
+  }
 
   QString target;
   bool defaultAppAllowed = false;

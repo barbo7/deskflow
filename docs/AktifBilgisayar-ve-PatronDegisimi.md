@@ -286,6 +286,22 @@ aynı uygulama açılır.
 | Spotify, Slack, Discord, Teams, Zoom, Notion, Figma... | Uygulama karşıda açılır, kaynaktaki penceresi kapanır; içeriği kendi hesabından gelir |
 | Listede olmayan uygulama | Belgesi varsa ve düz bir belgeyse varsayılan uygulamayla açılır, yoksa taşınmaz |
 
+### Tarayıcı eklentisi
+
+Chrome, Edge ve Brave için eklenti (`deploy/browser-extension`) kurulursa adresle birlikte
+kaydırma yeri, formlara yazılan metin ve video dakikası da gider. Pencereyi başlığından tutarsan tüm
+sekmeleri, sekmesinden tutarsan yalnızca o sekme taşınır.
+
+Parolalar, kart bilgileri, tek kullanımlık kodlar ve oturum çerezleri **taşınmaz**. Siteye girişin
+karşıda yoksa giriş sayfası açılır ve yazılanlar o sayfaya uygulanmaz.
+
+Kurulum (her bilgisayarda bir kez):
+
+1. Tarayıcıda `chrome://extensions` > **Geliştirici modu** > **Paketlenmemiş öğe yükle** ile bu klasörü seç.
+2. Uygulamanın yanındaki `deskflow-browser-host --install <eklenti kimliği>` komutunu çalıştır.
+
+Eklentisi olmayan tarafta yalnızca adresler açılır.
+
 Sınırlar:
 
 - Kaynak, ancak karşı taraf "açtım" dedikten sonra kapanır. Karşıda açılamazsa ya da sayfa/belge

@@ -10,6 +10,10 @@
 
 #include <QMetaEnum>
 
+#include <chrono>
+#include <future>
+#include <memory>
+
 void ipcSendToClient(const QString &command, const QString &args)
 {
   // Queued because callers may not be on the main thread,
@@ -24,7 +28,11 @@ void ipcSendToClient(const QString &command, const QString &args)
 void ipcSendConnectionState(deskflow::core::ConnectionState state)
 {
   const auto metaEnum = QMetaEnum::fromType<deskflow::core::ConnectionState>();
-  ipcSendToClient(QStringLiteral("connectionState"), metaEnum.valueToKey(static_cast<int>(state)));
+  const QString key = QString::fromLatin1(metaEnum.valueToKey(static_cast<int>(state)));
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server, [key] { deskflow::core::ipc::CoreIpcServer::instance().setConnectionState(key); }, Qt::QueuedConnection
+  );
 }
 
 void ipcSendActiveComputer(const QString &active, const QString &computers)
@@ -42,6 +50,50 @@ void ipcSendMonitors(const QString &monitors)
   auto &server = deskflow::core::ipc::CoreIpcServer::instance();
   QMetaObject::invokeMethod(
       &server, [monitors] { deskflow::core::ipc::CoreIpcServer::instance().setMonitors(monitors); },
+      Qt::QueuedConnection
+  );
+}
+
+bool ipcHasBrowserHost(const QString &browser)
+{
+  return deskflow::core::ipc::CoreIpcServer::instance().hasBrowserHost(browser);
+}
+
+QByteArray ipcCaptureBrowserState(const QString &browser, const QString &mode, const QString &url, int timeoutMs)
+{
+  auto reply = std::make_shared<std::promise<QByteArray>>();
+  auto answer = reply->get_future();
+
+  // not a blocking call into the server's thread: at shutdown that thread waits for this one
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server,
+      [browser, mode, url, reply] {
+        deskflow::core::ipc::CoreIpcServer::instance().requestBrowserState(browser, mode, url, reply);
+      },
+      Qt::QueuedConnection
+  );
+
+  if (answer.wait_for(std::chrono::milliseconds(timeoutMs)) != std::future_status::ready) {
+    return {};
+  }
+  return answer.get();
+}
+
+void ipcCloseBrowserTabs(const QString &browser, const QList<int> &tabIds)
+{
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server, [browser, tabIds] { deskflow::core::ipc::CoreIpcServer::instance().closeBrowserTabs(browser, tabIds); },
+      Qt::QueuedConnection
+  );
+}
+
+void ipcRestoreBrowserTabs(const QString &browser, const QByteArray &json)
+{
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server, [browser, json] { deskflow::core::ipc::CoreIpcServer::instance().restoreBrowserTabs(browser, json); },
       Qt::QueuedConnection
   );
 }

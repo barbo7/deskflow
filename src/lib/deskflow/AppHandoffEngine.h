@@ -93,6 +93,7 @@ private:
   void captureAndPost(const std::string &target, bool dragged, bool releaseButton);
   void finishPending(bool opened);
   void openAndReport(const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data);
+  static bool openPageState(const handoff::App *app, const std::string &data);
   static bool open(const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data);
 
   IEventQueue *m_events;
@@ -109,6 +110,7 @@ private:
   // what was sent and awaits the other computer's answer; only touched on the worker thread
   std::optional<handoff::CapturedApp> m_sent;
   bool m_sentAll = false;
+  QList<int> m_sentTabs; //!< the browser tabs to close, if its extension took care of them
 
   std::mutex m_mutex;
   std::condition_variable m_wake;

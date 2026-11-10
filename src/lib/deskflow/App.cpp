@@ -99,6 +99,8 @@ void App::run(QThread &coreThread)
       // process exits, the UI will restart us instantly. We don't really want
       // that behevior, so we quies for a bit
       Arch::sleep(10);
+      // the gui only restarts a core that tells it trying again may work
+      result = s_exitNoDisplay;
     } catch (std::runtime_error &re) {
       LOG_CRIT("a runtime error occurred: %s\n", re.what());
     } catch (std::exception &e) {

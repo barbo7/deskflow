@@ -81,6 +81,28 @@ void EdgePushAccumulatorTests::feed_awayFromEdge_resetsPush()
   QVERIFY(push.feed(60, 0, atRight(), now += 10ms));
 }
 
+void EdgePushAccumulatorTests::feed_stillAtEdge_keepsPush()
+{
+  // a slow trackpad sends movements that round to nothing in between
+  EdgePushAccumulator push(kRight, 100);
+  auto now = EdgePushAccumulator::Clock::now();
+
+  QVERIFY(!push.feed(60, 0, atRight(), now += 10ms));
+  QVERIFY(!push.feed(0, 0, atRight(), now += 10ms));
+  QVERIFY(!push.feed(0, 3, atRight(), now += 10ms));
+  QVERIFY(push.feed(60, 0, atRight(), now += 10ms));
+}
+
+void EdgePushAccumulatorTests::feed_offEdge_resetsPush()
+{
+  EdgePushAccumulator push(kRight, 100);
+  auto now = EdgePushAccumulator::Clock::now();
+
+  QVERIFY(!push.feed(60, 0, atRight(), now += 10ms));
+  QVERIFY(!push.feed(0, 0, {}, now += 10ms));
+  QVERIFY(!push.feed(60, 0, atRight(), now += 10ms));
+}
+
 void EdgePushAccumulatorTests::feed_pause_resetsPush()
 {
   EdgePushAccumulator push(kRight, 100);

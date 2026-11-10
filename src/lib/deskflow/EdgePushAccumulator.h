@@ -73,19 +73,29 @@ public:
       return false;
     }
 
+    // a movement with nothing toward the edge (a slow trackpad gives many) doesn't undo the push
+    // so far, as long as it stays at the edge; only moving away from it, or off it, does
     double push = 0;
-    if (watches(DirectionMask::LeftMask) && at.left && dx < 0) {
-      push = -dx;
-    } else if (watches(DirectionMask::RightMask) && at.right && dx > 0) {
-      push = dx;
-    } else if (watches(DirectionMask::TopMask) && at.top && dy < 0) {
-      push = -dy;
-    } else if (watches(DirectionMask::BottomMask) && at.bottom && dy > 0) {
-      push = dy;
-    }
+    bool stalled = false;
+    const auto consider = [this, &push, &stalled](DirectionMask mask, bool atEdge, double toward) {
+      if (push > 0 || !atEdge || !watches(mask)) {
+        return;
+      }
+      if (toward > 0) {
+        push = toward;
+      } else if (toward == 0) {
+        stalled = true;
+      }
+    };
+    consider(DirectionMask::LeftMask, at.left, -dx);
+    consider(DirectionMask::RightMask, at.right, dx);
+    consider(DirectionMask::TopMask, at.top, -dy);
+    consider(DirectionMask::BottomMask, at.bottom, dy);
 
     if (push <= 0) {
-      m_pushed = 0;
+      if (!stalled) {
+        m_pushed = 0;
+      }
       return false;
     }
 

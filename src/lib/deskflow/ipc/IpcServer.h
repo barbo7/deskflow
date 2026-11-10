@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <QByteArray>
+#include <QHash>
 #include <QObject>
 #include <QSet>
 
@@ -41,6 +43,28 @@ protected:
    */
   void writeToClientSocket(QLocalSocket *&clientSocket, const QString &message) const;
 
+  /**
+   * Whether \p clientSocket gets broadcasts and the messages queued while nobody did.
+   * Only asked once the client has said hello.
+   */
+  virtual bool wantsBroadcasts(QLocalSocket *clientSocket) const
+  {
+    (void)clientSocket;
+    return true;
+  }
+
+  //! Called when a client has said hello, after anything queued was sent to it.
+  virtual void clientGreeted(QLocalSocket *clientSocket)
+  {
+    (void)clientSocket;
+  }
+
+  //! Called when a client has gone away, before \p clientSocket is deleted.
+  virtual void clientDisconnected(QLocalSocket *clientSocket)
+  {
+    (void)clientSocket;
+  }
+
 private:
   void processMessage(QLocalSocket *clientSocket, const QString &message);
   virtual void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) = 0;
@@ -51,6 +75,9 @@ private:
 
   QLocalServer *m_server;
   QSet<QLocalSocket *> m_clients;
+  //! clients that have said hello; one that hasn't drops anything but the hello reply
+  QSet<QLocalSocket *> m_greeted;
+  QHash<QLocalSocket *, QByteArray> m_readBuffers;
   QString m_serverName;
   QStringList m_pendingMessages;
   QByteArray m_typeName;

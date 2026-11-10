@@ -6,10 +6,13 @@
 
 #pragma once
 
+#include <QByteArray>
+#include <QList>
 #include <QString>
 #include <QStringList>
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 /**
@@ -29,6 +32,23 @@ inline constexpr uint32_t kMaxFileSize = 32 * 1024 * 1024;
 
 //! Data is sent in pieces this big, well under the protocol's message limits.
 inline constexpr uint32_t kChunkSize = 512 * 1024;
+
+//! A browser's page state travels like a file, under this name.
+inline const QString kPageStateFileName = QStringLiteral(".deskflow-page-state.json");
+
+//! The browser's limit on a message to its extension, less some room.
+inline constexpr int kMaxPageState = 900 * 1024;
+
+//! What the browser extension says about the pages being moved.
+struct PageState
+{
+  QByteArray json;     //!< cleaned up: what's safe to send and to hand to the extension
+  QStringList urls;    //!< the address of each page
+  QList<int> tabIds;   //!< this browser's ids for the tabs; meaningless on another computer
+};
+
+//! Checks an extension's answer or a peer's page state; nothing left means nothing is usable.
+std::optional<PageState> parsePageState(const QByteArray &json);
 
 //! An app that exists on both Mac and Windows (or is at least a browser on one of them).
 struct App

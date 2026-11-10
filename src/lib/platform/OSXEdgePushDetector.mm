@@ -135,10 +135,10 @@ private:
       return event;
     }
 
+    // the deltas as doubles: a trackpad moves by fractions, which as integers are mostly 0
     self->handleMove(
-        CGEventGetLocation(event), static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaX)),
-        static_cast<double>(CGEventGetIntegerValueField(event, kCGMouseEventDeltaY)),
-        type == kCGEventLeftMouseDragged
+        CGEventGetLocation(event), CGEventGetDoubleValueField(event, kCGMouseEventDeltaX),
+        CGEventGetDoubleValueField(event, kCGMouseEventDeltaY), type == kCGEventLeftMouseDragged
     );
     return event;
   }
@@ -214,7 +214,16 @@ private:
     at.bottom = location.y >= CGRectGetMaxY(desktop) - 1;
 
     if (leftButtonHeld) {
-      if (m_onDragPush && m_dragAccumulator.feed(dx, dy, at, EdgePushAccumulator::Clock::now())) {
+      // once per drag, so a push that falls short can be told from one that never got there
+      const auto now = EdgePushAccumulator::Clock::now();
+      const bool againstEdge = EdgePushAccumulator::pushDirection(dx, dy, at) != Direction::NoDirection;
+      if (m_onDragPush && againstEdge && now - m_lastDragAtEdge > std::chrono::seconds(3)) {
+        LOG_INFO("dragging against an edge of the screen");
+      }
+      if (againstEdge) {
+        m_lastDragAtEdge = now;
+      }
+      if (m_onDragPush && m_dragAccumulator.feed(dx, dy, at, now)) {
         LOG_INFO("pushed against an edge with the left button held");
         m_onDragPush(EdgePushAccumulator::pushDirection(dx, dy, at));
       }
@@ -231,6 +240,7 @@ private:
   EdgePushAccumulator m_accumulator;
   Callback m_onPush;
   EdgePushAccumulator::Clock::time_point m_lastHotKey;
+  EdgePushAccumulator::Clock::time_point m_lastDragAtEdge;
   EdgePushAccumulator m_dragAccumulator{0, kPushThreshold};
   DragCallback m_onDragPush;
   Callback m_onHandoff;

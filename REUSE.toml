@@ -14,6 +14,7 @@ path = [
  , ".gitattributes"
  , ".gitignore"
  , "cspell.json"
+ , "deploy/browser-extension/manifest.json"
  , "sonar-project.properties"
  , "cmake/vcpkg.json.in"
  , "**/*.md"
@@ -42,6 +43,7 @@ path = [
  , "src/apps/res/icons/deskflow-**/apps/64/deskflow*.svg"
  , "src/apps/res/image/welcome.png"
  , "src/apps/res/Deskflow.icns"
+ , "deploy/browser-extension/icons/*.png"
  , "src/apps/res/deskflow.ico"
  , "src/apps/res/deskflow.qrc"
 ]

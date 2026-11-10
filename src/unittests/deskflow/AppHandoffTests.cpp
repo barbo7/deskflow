@@ -119,4 +119,37 @@ void AppHandoffTests::windowTitle_findsDocumentName()
   );
 }
 
+void AppHandoffTests::pageState_keepsWhatIsUsable()
+{
+  const auto state = parsePageState(R"({
+    "wholeWindow": true,
+    "tabIds": [7, 9],
+    "tabs": [
+      {"url": "https://a.example/x", "active": true, "state": {"scrollY": 40}},
+      {"url": "file:///etc/passwd", "state": {"scrollY": 1}},
+      {"url": "https://b.example/", "state": "not an object"}
+    ]
+  })");
+  QVERIFY(state.has_value());
+  const QStringList urls = {QStringLiteral("https://a.example/x"), QStringLiteral("https://b.example/")};
+  QCOMPARE(state->urls, urls);
+  const QList<int> ids = {7, 9};
+  QCOMPARE(state->tabIds, ids);
+
+  // the ids mean nothing elsewhere, and a state that isn't an object isn't passed on
+  QVERIFY(!state->json.contains("tabIds"));
+  QVERIFY(!state->json.contains("not an object"));
+  QVERIFY(!state->json.contains("passwd"));
+  QVERIFY(state->json.contains("\"wholeWindow\":true"));
+}
+
+void AppHandoffTests::pageState_refusesUnusable()
+{
+  QVERIFY(!parsePageState({}).has_value());
+  QVERIFY(!parsePageState("not json").has_value());
+  QVERIFY(!parsePageState(R"({"tabs": []})").has_value());
+  QVERIFY(!parsePageState(R"j({"tabs": [{"url": "javascript:alert(1)"}]})j").has_value());
+  QVERIFY(!parsePageState(QByteArray(kMaxPageState + 1, 'x')).has_value());
+}
+
 QTEST_MAIN(AppHandoffTests)

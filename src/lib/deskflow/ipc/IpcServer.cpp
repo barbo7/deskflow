@@ -63,15 +63,10 @@ void IpcServer::handleReadyRead()
   const auto clientSocket = qobject_cast<QLocalSocket *>(sender());
   LOG_VERBOSE("%s ipc server ready to read data", m_typeName.constData());
 
-  QByteArray data = clientSocket->readAll();
+  // a long message can arrive over several reads, so keep what's incomplete for next time
+  QByteArray data = m_readBuffers.take(clientSocket) + clientSocket->readAll();
   if (data.isEmpty()) {
     LOG_WARN("%s ipc server got empty message", m_typeName.constData());
-    return;
-  }
-
-  // we don't handle incomplete messages yet; each socket read must have delimiters.
-  if (!data.contains('\n')) {
-    LOG_WARN("%s ipc server got incomplete message: %s", m_typeName.constData(), data.constData());
     return;
   }
 
@@ -83,13 +78,20 @@ void IpcServer::handleReadyRead()
     QString message = QString::fromUtf8(messageData);
     processMessage(clientSocket, message);
   }
+
+  if (!data.isEmpty()) {
+    m_readBuffers.insert(clientSocket, data);
+  }
 }
 
 void IpcServer::handleDisconnected()
 {
   const auto clientSocket = qobject_cast<QLocalSocket *>(sender());
   LOG_DEBUG("%s ipc server client disconnected", m_typeName.constData());
+  clientDisconnected(clientSocket);
+  m_readBuffers.remove(clientSocket);
   m_clients.remove(clientSocket);
+  m_greeted.remove(clientSocket);
   clientSocket->deleteLater();
 }
 
@@ -102,7 +104,10 @@ void IpcServer::handleErrorOccurred()
     LOG_ERR("%s ipc server client error: %s", m_typeName.constData(), clientSocket->errorString().toUtf8().constData());
   }
 
+  clientDisconnected(clientSocket);
+  m_readBuffers.remove(clientSocket);
   m_clients.remove(clientSocket);
+  m_greeted.remove(clientSocket);
   clientSocket->deleteLater();
 }
 
@@ -142,13 +147,18 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
     LOG_DEBUG("%s ipc server sending hello back", m_typeName.constData());
     writeToClientSocket(clientSocket, QStringLiteral("hello=%1").arg(versionId));
 
-    // Replay messages that were queued before any clients connected.
-    LOG_VERBOSE("ipc server replaying %d pending messages", m_pendingMessages.size());
-    for (const auto &pending : std::as_const(m_pendingMessages)) {
-      LOG_VERBOSE("%s ipc server replaying: %s", m_typeName.constData(), pending.toUtf8().constData());
-      writeToClientSocket(clientSocket, pending);
+    m_greeted.insert(clientSocket);
+
+    // Replay messages that were queued while no client could take them.
+    if (wantsBroadcasts(clientSocket)) {
+      LOG_VERBOSE("ipc server replaying %d pending messages", m_pendingMessages.size());
+      for (const auto &pending : std::as_const(m_pendingMessages)) {
+        LOG_VERBOSE("%s ipc server replaying: %s", m_typeName.constData(), pending.toUtf8().constData());
+        writeToClientSocket(clientSocket, pending);
+      }
+      m_pendingMessages.clear();
     }
-    m_pendingMessages.clear();
+    clientGreeted(clientSocket);
   } else if (command == QStringLiteral("noop")) {
     LOG_DEBUG("%s ipc server got noop message", m_typeName.constData());
     writeToClientSocket(clientSocket, QStringLiteral("ok"));
@@ -163,7 +173,16 @@ void IpcServer::broadcastCommand(const QString &command, const QString &args)
 {
   const auto message = args.isEmpty() ? command : QStringLiteral("%1=%2").arg(command, args);
 
-  if (m_clients.isEmpty()) {
+  // a client that hasn't said hello yet would drop it, and some clients (browser extensions)
+  // have no use for it: if nobody else is there, keep it for whoever comes next
+  QList<QLocalSocket *> recipients;
+  for (auto *client : std::as_const(m_greeted)) {
+    if (wantsBroadcasts(client)) {
+      recipients.append(client);
+    }
+  }
+
+  if (recipients.isEmpty()) {
     LOG_VERBOSE(
         "%s ipc server has no clients, message queued: %s", m_typeName.constData(), message.toUtf8().constData()
     );
@@ -172,10 +191,10 @@ void IpcServer::broadcastCommand(const QString &command, const QString &args)
   }
 
   LOG_VERBOSE(
-      "%s ipc server broadcasting message to %d clients: %s", m_typeName.constData(), m_clients.size(),
+      "%s ipc server broadcasting message to %d clients: %s", m_typeName.constData(), recipients.size(),
       message.toUtf8().constData()
   );
-  for (auto *client : std::as_const(m_clients)) {
+  for (auto *client : std::as_const(recipients)) {
     writeToClientSocket(client, message);
     client->flush();
   }

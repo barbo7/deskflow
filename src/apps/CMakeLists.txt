@@ -48,5 +48,6 @@ if(WIN32)
 endif()
 
 add_subdirectory(deskflow-core)
+add_subdirectory(deskflow-browser-host)
 add_subdirectory(deskflow-daemon) #Only used on windows
 add_subdirectory(deskflow-gui)

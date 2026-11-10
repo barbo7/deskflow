@@ -20,4 +20,6 @@ private Q_SLOTS:
   void defaultApp_documentsOnly();
   void uniquePath_avoidsExistingFiles();
   void windowTitle_findsDocumentName();
+  void pageState_keepsWhatIsUsable();
+  void pageState_refusesUnusable();
 };

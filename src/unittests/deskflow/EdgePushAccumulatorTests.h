@@ -14,6 +14,8 @@ private Q_SLOTS:
   void feed_pushIntoUnwatchedEdge_neverTriggers();
   void feed_movingAlongEdge_neverTriggers();
   void feed_awayFromEdge_resetsPush();
+  void feed_stillAtEdge_keepsPush();
+  void feed_offEdge_resetsPush();
   void feed_pause_resetsPush();
   void feed_afterTrigger_staysQuiet();
   void pushDirection_findsTheEdge();

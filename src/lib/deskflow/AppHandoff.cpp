@@ -8,6 +8,9 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QStandardPaths>
 #include <QUrl>
 
@@ -302,6 +305,48 @@ QString receiveFolder()
     base = QDir::tempPath();
   }
   return QDir(base).filePath(QStringLiteral("Deskflow Handoff"));
+}
+
+std::optional<PageState> parsePageState(const QByteArray &json)
+{
+  if (json.isEmpty() || json.size() > kMaxPageState) {
+    return std::nullopt;
+  }
+  const auto object = QJsonDocument::fromJson(json).object();
+
+  PageState result;
+  QJsonArray tabs;
+  const auto given = object.value(QStringLiteral("tabs")).toArray();
+  for (const auto &entry : given) {
+    const auto tab = entry.toObject();
+    const auto url = tab.value(QStringLiteral("url")).toString();
+    if (!isAllowedUrl(url) || tabs.size() >= 40) {
+      continue;
+    }
+    QJsonObject clean = {
+        {QStringLiteral("url"), url}, {QStringLiteral("active"), tab.value(QStringLiteral("active")).toBool()}
+    };
+    if (const auto state = tab.value(QStringLiteral("state")); state.isObject()) {
+      clean.insert(QStringLiteral("state"), state);
+    }
+    tabs.append(clean);
+    result.urls.append(url);
+  }
+  if (tabs.isEmpty()) {
+    return std::nullopt;
+  }
+
+  const auto ids = object.value(QStringLiteral("tabIds")).toArray();
+  for (const auto &id : ids) {
+    result.tabIds.append(id.toInt());
+  }
+
+  const QJsonObject clean = {
+      {QStringLiteral("tabs"), tabs},
+      {QStringLiteral("wholeWindow"), object.value(QStringLiteral("wholeWindow")).toBool()},
+  };
+  result.json = QJsonDocument(clean).toJson(QJsonDocument::Compact);
+  return result;
 }
 
 QString documentNameFromWindowTitle(const QString &title)
