@@ -99,7 +99,11 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
 {
   // a button held at the edge is usually something else, like selecting text
   if (dragged && !isWindowBeingDragged()) {
-    LOG_INFO("app handoff: pushed against an edge, but no window is being dragged");
+    if (const auto files = draggedFiles(); !files.isEmpty()) {
+      sendFiles(target, files, releaseButton);
+      return;
+    }
+    LOG_INFO("app handoff: pushed against an edge, but no window or file is being dragged");
     return;
   }
 
@@ -178,6 +182,7 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
   m_sent = captured;
   m_sentAll = sentAll;
   m_sentTabs = extensionTabs;
+  m_sentFiles = false;
 
   if (dragged) {
     cancelWindowDrag();
@@ -188,6 +193,67 @@ void AppHandoffEngine::captureAndPost(const std::string &target, bool dragged, b
 
   LOG_INFO("app handoff: sending \"%s\"", qPrintable(captured.displayName));
   m_events->addEvent(Event(EventTypes::AppHandoffCaptured, m_eventTarget, info));
+}
+
+void AppHandoffEngine::sendFiles(const std::string &target, const QStringList &paths, bool releaseButton)
+{
+  // take the drag back before anything else: packing can take a moment, and letting go in the
+  // meantime would drop the files somewhere on this computer
+  cancelFileDrag();
+  if (releaseButton) {
+    releaseLeftButton();
+  }
+
+  LOG_INFO("app handoff: sending %d dragged item(s)", static_cast<int>(paths.size()));
+  const auto bundle = packFiles(paths);
+  if (bundle.data.isEmpty()) {
+    LOG_WARN("app handoff: can't send the dragged files: %s", qPrintable(bundle.error));
+    if (bundle.error == QStringLiteral("too large") || bundle.error == QStringLiteral("too many files")) {
+      tellUser(
+          QStringLiteral("Too much to send at once: at most %1 MB and %2 files")
+              .arg(kMaxBundleSize / (1024 * 1024))
+              .arg(kMaxBundleEntries)
+      );
+    } else {
+      tellUser(QStringLiteral("Couldn't send those files: %1").arg(bundle.error));
+    }
+    return;
+  }
+
+  auto *info = new HandoffCapture;
+  info->m_target = target;
+  info->m_fileName = kFilesBundleName.toStdString();
+  info->m_data.assign(bundle.data.constData(), static_cast<size_t>(bundle.data.size()));
+
+  if (m_sent.has_value()) {
+    forgetCapturedApp(*m_sent);
+  }
+  CapturedApp files;
+  files.displayName = QStringLiteral("%1 file(s)").arg(bundle.files);
+  m_sent = files;
+  m_sentAll = true;
+  m_sentTabs.clear();
+  m_sentFiles = true;
+
+  LOG_INFO(
+      "app handoff: sending %d file(s), %d bytes", bundle.files, static_cast<int>(bundle.data.size())
+  );
+  m_events->addEvent(Event(EventTypes::AppHandoffCaptured, m_eventTarget, info));
+}
+
+bool AppHandoffEngine::openFiles(const std::string &data)
+{
+  const auto folder = receiveFolder();
+  const auto written = unpackFiles(QByteArray::fromStdString(data), folder);
+  if (written.isEmpty()) {
+    LOG_WARN("app handoff: couldn't save the received files");
+    tellUser(QStringLiteral("Couldn't save the received files"));
+    return false;
+  }
+  LOG_INFO("app handoff: saved %d item(s) in \"%s\"", static_cast<int>(written.size()), qPrintable(folder));
+  revealFiles(written);
+  tellUser(QStringLiteral("Received %1 item(s), in Downloads, Deskflow Handoff").arg(written.size()));
+  return true;
 }
 
 void AppHandoffEngine::delivered(bool opened)
@@ -202,6 +268,18 @@ void AppHandoffEngine::finishPending(bool opened)
   }
   const auto sent = *m_sent;
   m_sent.reset();
+
+  // copies went: the originals stay where they are either way
+  if (m_sentFiles) {
+    m_sentFiles = false;
+    if (opened) {
+      LOG_INFO("app handoff: %s arrived on the other computer", qPrintable(sent.displayName));
+    } else {
+      LOG_WARN("app handoff: the other computer couldn't save %s", qPrintable(sent.displayName));
+      tellUser(QStringLiteral("The other computer couldn't save %1").arg(sent.displayName));
+    }
+    return;
+  }
 
   if (!opened) {
     LOG_WARN("app handoff: the other computer couldn't open \"%s\", it stays here", qPrintable(sent.displayName));
@@ -235,7 +313,10 @@ void AppHandoffEngine::begin(
 {
   reset();
 
-  if (size > kMaxFileSize) {
+  // a bundle of dragged files may be bigger than a single document
+  const uint32_t limit =
+      QString::fromStdString(fileName) == kFilesBundleName ? kMaxBundleSize + 1024 * 1024 : kMaxFileSize;
+  if (size > limit) {
     LOG_WARN("app handoff: refusing a file of %u bytes", size);
     return;
   }
@@ -314,6 +395,10 @@ bool AppHandoffEngine::open(
     const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data
 )
 {
+  if (QString::fromStdString(fileName) == kFilesBundleName) {
+    return openFiles(data);
+  }
+
   const auto *app = findAppById(QString::fromStdString(appId));
 
   if (QString::fromStdString(fileName) == kPageStateFileName) {

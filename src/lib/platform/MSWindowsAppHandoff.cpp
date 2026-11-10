@@ -13,11 +13,17 @@
 
 #include <Windows.h>
 
+#include <ExDisp.h>
+#include <ShlGuid.h>
+#include <ShlObj.h>
 #include <UIAutomation.h>
 #include <objbase.h>
+#include <servprov.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 
 #include <array>
+#include <vector>
 
 namespace deskflow::handoff {
 
@@ -68,6 +74,52 @@ public:
 private:
   bool m_ok;
 };
+
+// the items selected in a folder window or on the desktop; empty unless its view is the one
+// showing (windows 11 puts several tabs, each with its own view, in one window)
+QStringList shownSelection(IDispatch *window)
+{
+  QStringList paths;
+  IServiceProvider *services = nullptr;
+  if (FAILED(window->QueryInterface(IID_PPV_ARGS(&services)))) {
+    return paths;
+  }
+  IShellBrowser *browser = nullptr;
+  if (SUCCEEDED(services->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(&browser)))) {
+    IShellView *view = nullptr;
+    if (SUCCEEDED(browser->QueryActiveShellView(&view))) {
+      HWND viewWindow = nullptr;
+      IFolderView *folder = nullptr;
+      if (SUCCEEDED(view->GetWindow(&viewWindow)) && IsWindowVisible(viewWindow) &&
+          SUCCEEDED(view->QueryInterface(IID_PPV_ARGS(&folder)))) {
+        IShellItemArray *items = nullptr;
+        if (SUCCEEDED(folder->Items(SVGIO_SELECTION, IID_PPV_ARGS(&items)))) {
+          DWORD count = 0;
+          items->GetCount(&count);
+          for (DWORD i = 0; i < count; ++i) {
+            IShellItem *item = nullptr;
+            if (FAILED(items->GetItemAt(i, &item))) {
+              continue;
+            }
+            PWSTR path = nullptr;
+            // only real files and folders: not "This PC", libraries or the like
+            if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+              paths.append(QString::fromWCharArray(path));
+              CoTaskMemFree(path);
+            }
+            item->Release();
+          }
+          items->Release();
+        }
+        folder->Release();
+      }
+      view->Release();
+    }
+    browser->Release();
+  }
+  services->Release();
+  return paths;
+}
 
 // a browser's address bar is the first text box in its window. looking it up by name wouldn't
 // work: the name is translated into the browser's language.
@@ -293,6 +345,108 @@ void cancelWindowDrag()
   }
   inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
   SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+}
+
+QStringList draggedFiles()
+{
+  const int dragKey = GetSystemMetrics(SM_SWAPBUTTON) != 0 ? VK_RBUTTON : VK_LBUTTON;
+  if ((GetAsyncKeyState(dragKey) & 0x8000) == 0) {
+    return {};
+  }
+
+  // explorer drags what's selected (pressing on an item selects it first), from a folder
+  // window or the desktop, which stay in front during the drag
+  HWND front = GetForegroundWindow();
+  std::array<wchar_t, 64> name{};
+  if (front == nullptr || GetClassNameW(front, name.data(), static_cast<int>(name.size())) == 0) {
+    return {};
+  }
+  const auto className = QString::fromWCharArray(name.data());
+  const bool desktop = className == QStringLiteral("Progman") || className == QStringLiteral("WorkerW");
+  if (!desktop && className != QStringLiteral("CabinetWClass") && className != QStringLiteral("ExploreWClass")) {
+    return {};
+  }
+
+  ComScope com;
+  IShellWindows *windows = nullptr;
+  if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&windows)))) {
+    return {};
+  }
+
+  QStringList paths;
+  if (desktop) {
+    VARIANT none;
+    VariantInit(&none);
+    long handle = 0;
+    IDispatch *dispatch = nullptr;
+    if (SUCCEEDED(windows->FindWindowSW(&none, &none, SWC_DESKTOP, &handle, SWFO_NEEDDISPATCH, &dispatch)) &&
+        dispatch != nullptr) {
+      paths = shownSelection(dispatch);
+      dispatch->Release();
+    }
+  } else {
+    long count = 0;
+    windows->get_Count(&count);
+    for (long i = 0; i < count && paths.isEmpty(); ++i) {
+      VARIANT index;
+      VariantInit(&index);
+      index.vt = VT_I4;
+      index.lVal = i;
+      IDispatch *dispatch = nullptr;
+      if (FAILED(windows->Item(index, &dispatch)) || dispatch == nullptr) {
+        continue;
+      }
+      IWebBrowserApp *app = nullptr;
+      if (SUCCEEDED(dispatch->QueryInterface(IID_PPV_ARGS(&app)))) {
+        SHANDLE_PTR handle = 0;
+        if (SUCCEEDED(app->get_HWND(&handle)) && reinterpret_cast<HWND>(handle) == front) {
+          paths = shownSelection(dispatch);
+        }
+        app->Release();
+      }
+      dispatch->Release();
+    }
+  }
+  windows->Release();
+  return paths;
+}
+
+void cancelFileDrag()
+{
+  // escape takes back an explorer drag too
+  cancelWindowDrag();
+}
+
+void noteLeftButtonPressed()
+{
+  // explorer's selection tells what's dragged; nothing to keep track of
+}
+
+void revealFiles(const QStringList &paths)
+{
+  if (paths.isEmpty()) {
+    return;
+  }
+  ComScope com;
+  const auto folderPath = QDir::toNativeSeparators(QFileInfo(paths.first()).absolutePath()).toStdWString();
+  PIDLIST_ABSOLUTE folder = ILCreateFromPathW(folderPath.c_str());
+  if (folder == nullptr) {
+    return;
+  }
+  std::vector<PIDLIST_ABSOLUTE> items;
+  std::vector<PCUITEMID_CHILD> children;
+  for (const auto &path : paths) {
+    const auto native = QDir::toNativeSeparators(path).toStdWString();
+    if (PIDLIST_ABSOLUTE item = ILCreateFromPathW(native.c_str()); item != nullptr) {
+      items.push_back(item);
+      children.push_back(ILFindLastID(item));
+    }
+  }
+  SHOpenFolderAndSelectItems(folder, static_cast<UINT>(children.size()), children.data(), 0);
+  for (auto *item : items) {
+    ILFree(item);
+  }
+  ILFree(folder);
 }
 
 void releaseLeftButton()

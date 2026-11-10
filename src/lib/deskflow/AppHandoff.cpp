@@ -6,8 +6,12 @@
 
 #include "deskflow/AppHandoff.h"
 
+#include <QDataStream>
 #include <QDir>
+#include <QDirIterator>
+#include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -366,6 +370,195 @@ QString documentNameFromWindowTitle(const QString &title)
     name = name.left(bracket);
   }
   return name.trimmed();
+}
+
+namespace {
+
+constexpr quint32 kBundleMagic = 0x44464642; // "DFFB"
+constexpr quint32 kBundleVersion = 1;
+enum class BundleEntry : quint8
+{
+  File = 0,
+  Folder = 1
+};
+
+// a name inside a dragged folder: unlike a document's, hidden files are fine here
+QString safePathPart(const QString &part)
+{
+  static const QString forbidden = QStringLiteral("<>:\"|?*\\/");
+  QString cleaned;
+  for (const auto c : part) {
+    if (c.category() != QChar::Other_Control && !forbidden.contains(c)) {
+      cleaned.append(c);
+    }
+  }
+  // Windows silently drops trailing dots and spaces
+  while (cleaned.endsWith(QLatin1Char('.')) || cleaned.endsWith(QLatin1Char(' '))) {
+    cleaned.chop(1);
+  }
+  if (cleaned.isEmpty() || cleaned == QStringLiteral(".") || cleaned == QStringLiteral("..")) {
+    return {};
+  }
+  return cleaned.left(200);
+}
+
+// links of any kind point at something on this computer, which the other one doesn't have
+bool isLink(const QFileInfo &info)
+{
+  return info.isSymLink() || info.isShortcut() || info.isAlias() || info.isJunction();
+}
+
+bool isJunk(const QString &name)
+{
+  return name == QStringLiteral(".DS_Store") || name == QStringLiteral("Thumbs.db") ||
+         name == QStringLiteral("desktop.ini");
+}
+
+} // namespace
+
+FileBundle packFiles(const QStringList &paths)
+{
+  struct Entry
+  {
+    QString name; // relative, with "/"
+    QString path; // on this computer; empty for a folder
+  };
+  QList<Entry> entries;
+  qint64 total = 0;
+
+  const auto add = [&entries, &total](const QString &name, const QFileInfo &info) -> QString {
+    if (entries.size() >= kMaxBundleEntries) {
+      return QStringLiteral("too many files");
+    }
+    if (info.isDir()) {
+      entries.append({name, {}});
+      return {};
+    }
+    total += info.size();
+    if (total > kMaxBundleSize) {
+      return QStringLiteral("too large");
+    }
+    entries.append({name, info.absoluteFilePath()});
+    return {};
+  };
+
+  for (const auto &path : paths) {
+    const QFileInfo top(path);
+    if (!top.exists() || isLink(top)) {
+      continue;
+    }
+    if (auto error = add(top.fileName(), top); !error.isEmpty()) {
+      return {{}, 0, error};
+    }
+    if (!top.isDir()) {
+      continue;
+    }
+    const QDir base(top.absoluteFilePath());
+    QDirIterator it(
+        top.absoluteFilePath(), QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
+        QDirIterator::Subdirectories
+    );
+    while (it.hasNext()) {
+      it.next();
+      const auto info = it.fileInfo();
+      if (isLink(info) || isJunk(info.fileName())) {
+        continue;
+      }
+      if (auto error = add(top.fileName() + QLatin1Char('/') + base.relativeFilePath(info.absoluteFilePath()), info);
+          !error.isEmpty()) {
+        return {{}, 0, error};
+      }
+    }
+  }
+  if (entries.isEmpty()) {
+    return {{}, 0, QStringLiteral("nothing to send")};
+  }
+
+  FileBundle bundle;
+  QDataStream out(&bundle.data, QIODevice::WriteOnly);
+  out.setVersion(QDataStream::Qt_6_0);
+  out << kBundleMagic << kBundleVersion << static_cast<quint32>(entries.size());
+  for (const auto &entry : std::as_const(entries)) {
+    if (entry.path.isEmpty()) {
+      out << entry.name << static_cast<quint8>(BundleEntry::Folder) << QByteArray();
+      continue;
+    }
+    QFile file(entry.path);
+    if (!file.open(QIODevice::ReadOnly)) {
+      return {{}, 0, QStringLiteral("can't read %1").arg(entry.name)};
+    }
+    out << entry.name << static_cast<quint8>(BundleEntry::File) << file.readAll();
+    ++bundle.files;
+  }
+  if (bundle.data.size() > static_cast<qsizetype>(kMaxBundleSize) + 1024 * 1024) {
+    return {{}, 0, QStringLiteral("too large")};
+  }
+  return bundle;
+}
+
+QStringList unpackFiles(const QByteArray &bundle, const QString &folder)
+{
+  QDataStream in(bundle);
+  in.setVersion(QDataStream::Qt_6_0);
+  quint32 magic = 0;
+  quint32 version = 0;
+  quint32 count = 0;
+  in >> magic >> version >> count;
+  if (in.status() != QDataStream::Ok || magic != kBundleMagic || version != kBundleVersion ||
+      count > static_cast<quint32>(kMaxBundleEntries) || !QDir().mkpath(folder)) {
+    return {};
+  }
+
+  const QDir root(folder);
+  QHash<QString, QString> topNames; // as sent -> as written here
+  QStringList written;
+  for (quint32 i = 0; i < count; ++i) {
+    QString name;
+    quint8 kind = 0;
+    QByteArray data;
+    in >> name >> kind >> data;
+    if (in.status() != QDataStream::Ok) {
+      break;
+    }
+
+    // every part cleaned up on its own: nothing can climb out of the folder
+    QStringList parts;
+    const auto given = name.split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    for (const auto &part : given) {
+      parts.append(safePathPart(part));
+    }
+    if (parts.isEmpty() || parts.contains(QString())) {
+      continue;
+    }
+
+    auto top = topNames.value(parts.first());
+    if (top.isEmpty()) {
+      top = QFileInfo(uniqueFilePath(folder, parts.first())).fileName();
+      topNames.insert(parts.first(), top);
+      written.append(root.filePath(top));
+    }
+    parts.first() = top;
+    const auto target = root.filePath(parts.join(QLatin1Char('/')));
+
+    if (static_cast<BundleEntry>(kind) == BundleEntry::Folder) {
+      QDir().mkpath(target);
+      continue;
+    }
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    QFile file(target);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly) || file.write(data) != data.size()) {
+      continue;
+    }
+  }
+
+  // only what's really there
+  QStringList result;
+  for (const auto &path : std::as_const(written)) {
+    if (QFileInfo::exists(path)) {
+      result.append(path);
+    }
+  }
+  return result;
 }
 
 } // namespace deskflow::handoff

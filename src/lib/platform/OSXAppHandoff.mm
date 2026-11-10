@@ -10,12 +10,26 @@
 
 #include <QProcess>
 
+#include <atomic>
+
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 
 namespace deskflow::handoff {
 
 namespace {
+
+// the drag pasteboard's change count when the left button last went down: a drag that started
+// since writes to it, so a higher count means what's on it is what's being dragged now (and not
+// what some earlier drag left there)
+std::atomic<long> s_dragCountAtPress{-1};
+
+long dragPasteboardChangeCount()
+{
+  @autoreleasepool {
+    return static_cast<long>([[NSPasteboard pasteboardWithName:NSPasteboardNameDrag] changeCount]);
+  }
+}
 
 // long enough to answer macOS asking whether Deskflow may control the browser
 const int kScriptTimeoutMs = 20000;
@@ -355,6 +369,55 @@ bool launchApp(const App &app, const QString &target)
 bool openWithDefaultApp(const QString &target)
 {
   return !target.isEmpty() && runOpen({target});
+}
+
+void noteLeftButtonPressed()
+{
+  s_dragCountAtPress = dragPasteboardChangeCount();
+}
+
+QStringList draggedFiles()
+{
+  const long atPress = s_dragCountAtPress;
+  if (atPress < 0 || dragPasteboardChangeCount() <= atPress) {
+    return {};
+  }
+
+  QStringList paths;
+  @autoreleasepool {
+    NSPasteboard *pasteboard = [NSPasteboard pasteboardWithName:NSPasteboardNameDrag];
+    NSArray<NSURL *> *urls = [pasteboard readObjectsForClasses:@[ [NSURL class] ]
+                                                       options:@{NSPasteboardURLReadingFileURLsOnlyKey : @YES}];
+    for (NSURL *url in urls) {
+      if (url.isFileURL && url.path != nil) {
+        paths.append(QString::fromNSString(url.path));
+      }
+    }
+  }
+  return paths;
+}
+
+void cancelFileDrag()
+{
+  // escape takes a drag back, in Finder as anywhere else
+  for (const bool down : {true, false}) {
+    CGEventRef key = CGEventCreateKeyboardEvent(nullptr, 53, down);
+    CGEventPost(kCGHIDEventTap, key);
+    CFRelease(key);
+  }
+}
+
+void revealFiles(const QStringList &paths)
+{
+  @autoreleasepool {
+    NSMutableArray<NSURL *> *urls = [NSMutableArray array];
+    for (const auto &path : paths) {
+      [urls addObject:[NSURL fileURLWithPath:path.toNSString()]];
+    }
+    if (urls.count > 0) {
+      [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:urls];
+    }
+  }
 }
 
 } // namespace deskflow::handoff

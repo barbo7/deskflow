@@ -22,4 +22,8 @@ private Q_SLOTS:
   void windowTitle_findsDocumentName();
   void pageState_keepsWhatIsUsable();
   void pageState_refusesUnusable();
+  void files_roundTripFoldersAndFiles();
+  void files_neverOverwrite();
+  void files_stayInsideTheFolder();
+  void files_refuseTooMany();
 };

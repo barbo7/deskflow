@@ -6,6 +6,7 @@
 
 #include "deskflow/AppHandoff.h"
 
+#include <QFileInfo>
 #include <QProcess>
 
 namespace deskflow::handoff {
@@ -40,6 +41,29 @@ void cancelWindowDrag()
 void releaseLeftButton()
 {
   // nothing to release
+}
+
+QStringList draggedFiles()
+{
+  return {};
+}
+
+void cancelFileDrag()
+{
+  // nothing to cancel
+}
+
+void noteLeftButtonPressed()
+{
+  // drags aren't watched here
+}
+
+void revealFiles(const QStringList &paths)
+{
+  // the folder they're in is the best this can do
+  if (!paths.isEmpty()) {
+    QProcess::startDetached(QStringLiteral("xdg-open"), {QFileInfo(paths.first()).absolutePath()});
+  }
 }
 
 bool launchApp(const App &, const QString &)

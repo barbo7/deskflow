@@ -264,9 +264,9 @@ tuşu bırakmadan **kenara doğru itmeye devam et**. Uygulama karşıda açılı
 sadece değmek yetmez, böylece Windows'un yarım ekran yerleştirmesi bozulmaz. Kaynak pencere, karşı taraf açtıktan sonra
 kapanır.
 
-Metin seçerken ya da dosya sürüklerken kenara itmek bir şey yapmaz: yalnızca başlık çubuğundan tutulan
-pencere ve tarayıcı sekmesi sayılır. Mac pencerenin sürüklendiğini söyleyemediği için orada imlecin
-pencerenin üst şeridinde olmasına bakılır.
+Metin seçerken kenara itmek bir şey yapmaz: yalnızca başlık çubuğundan tutulan pencere, tarayıcı
+sekmesi ve Finder/Gezgin'den sürüklenen dosyalar sayılır. Mac pencerenin sürüklendiğini söyleyemediği
+için orada imlecin pencerenin üst şeridinde olmasına bakılır.
 
 **Kısayolla:** öndeki uygulamayı bir sonraki bilgisayara gönderir.
 
@@ -286,6 +286,21 @@ aynı uygulama açılır.
 | Spotify, Slack, Discord, Teams, Zoom, Notion, Figma... | Uygulama karşıda açılır, kaynaktaki penceresi kapanır; içeriği kendi hesabından gelir |
 | Listede olmayan uygulama | Belgesi varsa ve düz bir belgeyse varsayılan uygulamayla açılır, yoksa taşınmaz |
 
+### Dosya sürükle-bırak
+
+Finder'dan ya da Gezgin'den (masaüstü dahil) dosya veya klasör tut, öbür bilgisayara bakan kenara
+götür ve itmeye devam et. Sürükleme kaynakta geri alınır ve **kopyalar** karşıya gider: kaynaktaki
+dosyalar yerinde kalır. Karşıda `İndirilenler/Deskflow Handoff` klasörüne kaydedilir ve Finder'da /
+Gezgin'de seçili gösterilir. Aynı adda bir şey varsa yenisi "ad (2)" olur; hiçbir şeyin üzerine yazılmaz.
+
+- Bir seferde en fazla 100 MB ve 5000 dosya. Klasörlerin içi olduğu gibi gider; kısayollar/sembolik
+  bağlantılar, `.DS_Store`, `Thumbs.db` ve `desktop.ini` atlanır.
+- Mac'te sürüklenen dosyalar sürükleme panosundan, Windows'ta Gezgin'de seçili olanlardan bulunur
+  (bir öğeye basıp sürüklemek onu seçer).
+- Alınan dosyalar açılmaz, yalnızca gösterilir. Gelen adlar temizlenir; hiçbir şey o klasörün
+  dışına yazılamaz.
+- Büyük aktarım, bitene kadar fareyi ve klavyeyi biraz yavaşlatabilir: aynı bağlantıdan gider.
+
 ### Tarayıcı eklentisi
 
 Chrome, Edge ve Brave için eklenti (`deploy/browser-extension`) kurulursa adresle birlikte
@@ -295,12 +310,31 @@ sekmeleri, sekmesinden tutarsan yalnızca o sekme taşınır.
 Parolalar, kart bilgileri, tek kullanımlık kodlar ve oturum çerezleri **taşınmaz**. Siteye girişin
 karşıda yoksa giriş sayfası açılır ve yazılanlar o sayfaya uygulanmaz.
 
-Kurulum (her bilgisayarda bir kez):
+Kurulum (her bilgisayarda bir kez): tarayıcıda `chrome://extensions` > **Geliştirici modu** >
+**Paketlenmemiş öğe yükle** ile bu klasörü seç. Kimliği `lknngmlfmelklclengkdmonfgggiameg` olmalı.
+Deskflow her açılışta eklentinin yardımcı programını (`deskflow-browser-host`) yüklü tarayıcılara
+kendisi tanıtır; elle komut gerekmez.
 
-1. Tarayıcıda `chrome://extensions` > **Geliştirici modu** > **Paketlenmemiş öğe yükle** ile bu klasörü seç.
-2. Uygulamanın yanındaki `deskflow-browser-host --install <eklenti kimliği>` komutunu çalıştır.
+Klasörden yüklenen eklenti, dosyaları değişince en geç bir dakika içinde kendini yeniden yükler;
+güncellemeden sonra `chrome://extensions` sayfasına girmek gerekmez. Araç çubuğundaki simgesinde
+kırmızı "!" varsa Deskflow'a ulaşamıyordur.
 
 Eklentisi olmayan tarafta yalnızca adresler açılır.
+
+**İleride, başka tarayıcılar için notlar** (yapılmadı):
+
+- **Edge, Brave, Opera, Vivaldi:** Chromium tabanlı; aynı klasör geliştirici modunda yüklenebilir.
+  Edge ve Brave için yardımcı programın kaydı zaten yapılıyor; Opera ve Vivaldi için
+  `deskflow-browser-host.cpp`'deki `--install` listesine klasörleri eklemek yeter.
+- **Firefox:** Aynı WebExtension kodu küçük değişiklikle çalışır (`chrome.*` yerine `browser.*`,
+  manifest'te `browser_specific_settings.gecko.id`, `service_worker` yerine `background.scripts`).
+  Yardımcı programın Firefox kaydı ayrı yerde durur (Mac: `~/Library/Application Support/Mozilla/NativeMessagingHosts`,
+  Windows: `HKCU\Software\Mozilla\NativeMessagingHosts`) ve `allowed_origins` yerine
+  `allowed_extensions` ister. Kalıcı kurulum için eklentinin Mozilla tarafından imzalanması gerekir.
+- **Safari:** Bir Mac uygulamasının içinde "Safari Web Extension" olarak paketlenmesi, Xcode ile
+  imzalanması ve yerel mesajlaşma yerine uygulamayla konuşması gerekir. En zahmetlisi.
+- **Tek tık kurulum:** Geliştirici modu olmadan kurmak için eklentinin Chrome Web Store'a (liste dışı
+  olarak) yüklenmesi gerekir; bu bir geliştirici hesabı ve Google onayı ister.
 
 Sınırlar:
 

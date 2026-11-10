@@ -39,6 +39,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLocalServer>
@@ -48,6 +49,7 @@
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkInterface>
+#include <QProcess>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
@@ -636,8 +638,33 @@ void MainWindow::serverConnectionConfigureClient(const QString &clientName)
 // End slots
 //////////////////////////////////////////////////////////////////////////////
 
+namespace {
+
+// the id the browser extension in deploy/browser-extension gets from the key in its manifest
+const auto kBrowserExtensionId = QStringLiteral("lknngmlfmelklclengkdmonfgggiameg");
+
+// tells the installed browsers where the extension's helper is, so the extension only needs
+// loading; done every start, since the app (and so the helper) may have moved
+void registerBrowserHost()
+{
+  auto host = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("deskflow-browser-host"));
+  if (deskflow::platform::isWindows()) {
+    host += QStringLiteral(".exe");
+  }
+  if (!QFileInfo::exists(host)) {
+    return;
+  }
+  if (!QProcess::startDetached(host, {QStringLiteral("--install"), kBrowserExtensionId})) {
+    qWarning().noquote() << "couldn't register the browser extension's helper:" << host;
+  }
+}
+
+} // namespace
+
 void MainWindow::open()
 {
+  registerBrowserHost();
+
   if (!Settings::value(Settings::Gui::Autohide).toBool())
     showAndActivate();
   else if (deskflow::platform::isMac())

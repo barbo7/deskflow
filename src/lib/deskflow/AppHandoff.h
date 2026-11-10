@@ -39,6 +39,12 @@ inline const QString kPageStateFileName = QStringLiteral(".deskflow-page-state.j
 //! The browser's limit on a message to its extension, less some room.
 inline constexpr int kMaxPageState = 900 * 1024;
 
+//! The name a bundle of dragged files travels under, instead of a document's.
+inline const QString kFilesBundleName = QStringLiteral(".deskflow-files.bundle");
+//! The most a bundle of dragged files may hold, in bytes and in entries.
+inline constexpr uint32_t kMaxBundleSize = 100 * 1024 * 1024;
+inline constexpr int kMaxBundleEntries = 5000;
+
 //! What the browser extension says about the pages being moved.
 struct PageState
 {
@@ -95,6 +101,28 @@ QString receiveFolder();
 //! The name of a document from a window title such as "● report.docx - Word".
 QString documentNameFromWindowTitle(const QString &title);
 
+//! Files and folders packed to send at once.
+struct FileBundle
+{
+  QByteArray data;
+  int files = 0; //!< files in it, not counting folders
+  QString error; //!< why there's no data, if there isn't
+};
+
+/**
+ * Packs \p paths, files or folders (with everything in them), keeping their names and the
+ * layout inside folders. Links aren't followed. Fails, with error set, when it would hold more
+ * than kMaxBundleSize bytes or kMaxBundleEntries entries, or something can't be read.
+ */
+FileBundle packFiles(const QStringList &paths);
+
+/**
+ * Unpacks a bundle from packFiles() into \p folder. Each top level item gets a name not taken
+ * there yet, and nothing is written outside \p folder whatever the names in it say.
+ * \return the top level items it wrote; empty if the bundle isn't usable.
+ */
+QStringList unpackFiles(const QByteArray &bundle, const QString &folder);
+
 //! What's in front on this computer.
 struct CapturedApp
 {
@@ -133,6 +161,21 @@ void cancelWindowDrag();
 
 //! Lets go of the left button, for a drag made with this computer's own mouse.
 void releaseLeftButton();
+
+/**
+ * The files being dragged with the left button right now (in Finder or Explorer, say), if
+ * that's what's being dragged; empty otherwise.
+ */
+QStringList draggedFiles();
+
+//! Takes back a drag of files, so they don't land anywhere on this computer.
+void cancelFileDrag();
+
+//! For the platform to tell a drag that started with this press from an old one. Any thread.
+void noteLeftButtonPressed();
+
+//! Shows \p paths, all in the same folder, selected in Finder or Explorer.
+void revealFiles(const QStringList &paths);
 
 //! Starts \p app, opening \p target (an address or a file path) if it isn't empty.
 bool launchApp(const App &app, const QString &target);

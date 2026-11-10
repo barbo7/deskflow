@@ -71,6 +71,7 @@ public:
 
   /**
    * The same, but only if a window really is being dragged by its title bar, and ending the drag.
+   * If files are being dragged instead (from Finder or Explorer), it sends copies of those.
    * \param target Computer to send to; empty lets the server pick.
    * \param releaseButton Let go of the left button here: the drag was made with this computer's
    *        own mouse. When the server's mouse made it, the server sends the button up instead.
@@ -91,6 +92,8 @@ private:
   void run();
   void reset();
   void captureAndPost(const std::string &target, bool dragged, bool releaseButton);
+  void sendFiles(const std::string &target, const QStringList &paths, bool releaseButton);
+  static bool openFiles(const std::string &data);
   void finishPending(bool opened);
   void openAndReport(const std::string &appId, const std::string &url, const std::string &fileName, const std::string &data);
   static bool openPageState(const handoff::App *app, const std::string &data);
@@ -111,6 +114,7 @@ private:
   std::optional<handoff::CapturedApp> m_sent;
   bool m_sentAll = false;
   QList<int> m_sentTabs; //!< the browser tabs to close, if its extension took care of them
+  bool m_sentFiles = false; //!< copies of files went: there's nothing to close here
 
   std::mutex m_mutex;
   std::condition_variable m_wake;

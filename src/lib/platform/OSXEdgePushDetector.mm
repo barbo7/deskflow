@@ -7,6 +7,7 @@
 #include "platform/EdgePushDetector.h"
 
 #include "base/Log.h"
+#include "deskflow/AppHandoff.h"
 #include "deskflow/EdgePushAccumulator.h"
 
 #include <ApplicationServices/ApplicationServices.h>
@@ -68,7 +69,8 @@ public:
   {
     // listen only: the tap never holds up or changes an event
     const CGEventMask mask = CGEventMaskBit(kCGEventMouseMoved) | CGEventMaskBit(kCGEventLeftMouseDragged) |
-                             CGEventMaskBit(kCGEventRightMouseDragged) | CGEventMaskBit(kCGEventOtherMouseDragged);
+                             CGEventMaskBit(kCGEventRightMouseDragged) | CGEventMaskBit(kCGEventOtherMouseDragged) |
+                             CGEventMaskBit(kCGEventLeftMouseDown);
     m_tap = CGEventTapCreate(
         kCGSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionListenOnly, mask, &OSXEdgePushDetector::onEvent,
         this
@@ -122,6 +124,12 @@ private:
       if (self->m_keyTap != nullptr) {
         CGEventTapEnable(self->m_keyTap, true);
       }
+      return event;
+    }
+
+    // any press, even one deskflow made for the server's mouse: a drag of files starts with it
+    if (type == kCGEventLeftMouseDown) {
+      deskflow::handoff::noteLeftButtonPressed();
       return event;
     }
 

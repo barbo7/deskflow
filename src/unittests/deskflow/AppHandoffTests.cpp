@@ -8,7 +8,11 @@
 
 #include "deskflow/AppHandoff.h"
 
+#include <QDataStream>
+#include <QDir>
+#include <QDirIterator>
 #include <QFile>
+#include <QFileInfo>
 #include <QSet>
 #include <QTemporaryDir>
 
@@ -150,6 +154,102 @@ void AppHandoffTests::pageState_refusesUnusable()
   QVERIFY(!parsePageState(R"({"tabs": []})").has_value());
   QVERIFY(!parsePageState(R"j({"tabs": [{"url": "javascript:alert(1)"}]})j").has_value());
   QVERIFY(!parsePageState(QByteArray(kMaxPageState + 1, 'x')).has_value());
+}
+
+namespace {
+void writeFile(const QString &path, const QByteArray &contents)
+{
+  QDir().mkpath(QFileInfo(path).absolutePath());
+  QFile file(path);
+  QVERIFY(file.open(QIODevice::WriteOnly));
+  file.write(contents);
+}
+
+QByteArray readFile(const QString &path)
+{
+  QFile file(path);
+  return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray("<missing>");
+}
+} // namespace
+
+void AppHandoffTests::files_roundTripFoldersAndFiles()
+{
+  QTemporaryDir from;
+  QTemporaryDir to;
+  writeFile(from.filePath("notes.txt"), "hello");
+  writeFile(from.filePath("project/src/main.cpp"), "int main() {}");
+  writeFile(from.filePath("project/.gitignore"), "build/");
+  writeFile(from.filePath("project/.DS_Store"), "junk");
+  QDir(from.path()).mkpath("project/empty");
+  // a symbolic link on macOS, a shortcut on Windows (which only counts as one with this suffix)
+  QFile::link(from.filePath("notes.txt"), from.filePath("project/link.lnk"));
+
+  const auto bundle = deskflow::handoff::packFiles({from.filePath("notes.txt"), from.filePath("project")});
+  QVERIFY2(bundle.error.isEmpty(), qPrintable(bundle.error));
+  QCOMPARE(bundle.files, 3);
+
+  const auto written = deskflow::handoff::unpackFiles(bundle.data, to.path());
+  QCOMPARE(written.size(), 2);
+  QCOMPARE(readFile(to.filePath("notes.txt")), QByteArray("hello"));
+  QCOMPARE(readFile(to.filePath("project/src/main.cpp")), QByteArray("int main() {}"));
+  QCOMPARE(readFile(to.filePath("project/.gitignore")), QByteArray("build/"));
+  QVERIFY(QFileInfo(to.filePath("project/empty")).isDir());
+  QVERIFY(!QFileInfo::exists(to.filePath("project/.DS_Store")));
+  QVERIFY(!QFileInfo::exists(to.filePath("project/link.lnk")));
+}
+
+void AppHandoffTests::files_neverOverwrite()
+{
+  QTemporaryDir from;
+  QTemporaryDir to;
+  writeFile(from.filePath("report.pdf"), "new");
+  writeFile(to.filePath("report.pdf"), "old");
+
+  const auto written =
+      deskflow::handoff::unpackFiles(deskflow::handoff::packFiles({from.filePath("report.pdf")}).data, to.path());
+  QCOMPARE(written, QStringList{to.filePath("report (2).pdf")});
+  QCOMPARE(readFile(to.filePath("report.pdf")), QByteArray("old"));
+  QCOMPARE(readFile(to.filePath("report (2).pdf")), QByteArray("new"));
+}
+
+void AppHandoffTests::files_stayInsideTheFolder()
+{
+  // a peer could send any names at all
+  QByteArray bundle;
+  QDataStream out(&bundle, QIODevice::WriteOnly);
+  out.setVersion(QDataStream::Qt_6_0);
+  out << quint32(0x44464642) << quint32(1) << quint32(4);
+  out << QString("../escaped.txt") << quint8(0) << QByteArray("x");
+  out << QString("/etc/evil") << quint8(0) << QByteArray("x");
+  out << QString("ok/../../up.txt") << quint8(0) << QByteArray("x");
+  out << QString("C:\\Windows\\bad.txt") << quint8(0) << QByteArray("x");
+
+  QTemporaryDir parent;
+  const auto folder = parent.filePath("inbox");
+  const auto written = deskflow::handoff::unpackFiles(bundle, folder);
+
+  for (const auto &path : written) {
+    QVERIFY2(QFileInfo(path).absoluteFilePath().startsWith(QFileInfo(folder).absoluteFilePath() + "/"), qPrintable(path));
+  }
+  QVERIFY(!QFileInfo::exists(parent.filePath("escaped.txt")));
+  QVERIFY(!QFileInfo::exists(parent.filePath("up.txt")));
+  QDirIterator it(parent.path(), QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+  while (it.hasNext()) {
+    QVERIFY2(it.next().startsWith(QFileInfo(folder).absoluteFilePath() + "/"), qPrintable(it.filePath()));
+  }
+}
+
+void AppHandoffTests::files_refuseTooMany()
+{
+  QTemporaryDir from;
+  for (int i = 0; i <= deskflow::handoff::kMaxBundleEntries; ++i) {
+    writeFile(from.filePath(QStringLiteral("many/%1.txt").arg(i)), "x");
+  }
+  const auto bundle = deskflow::handoff::packFiles({from.filePath("many")});
+  QVERIFY(bundle.data.isEmpty());
+  QVERIFY(!bundle.error.isEmpty());
+
+  QVERIFY(deskflow::handoff::unpackFiles(QByteArray("not a bundle"), from.filePath("out")).isEmpty());
 }
 
 QTEST_MAIN(AppHandoffTests)
